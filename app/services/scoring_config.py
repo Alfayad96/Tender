@@ -1,387 +1,468 @@
+# app/services/scoring_config.py
+
+# =========================================
+# 🟢 STARK POSITIVE GRUPPEN
+# =========================================
+
 STRONG_POSITIVE_GROUPS = [
     {
-        "name": "mobile_app",
-        "weight": 18,
-        "variants": [
-            "app",
-            "apps",
-            "mobile app",
-            "mobile-app",
-            "mobile application",
-            "mobile applications",
-            "mobile anwendung",
-            "app entwicklung",
-            "app-entwicklung",
-            "app development",
-            "app entwickler",
-            "app programmierung"
-        ]
-    },
-    {
-        "name": "web_app",
-        "weight": 18,
-        "variants": [
-            "webapp",
-            "web-app",
-            "web apps",
-            "web application",
-            "web applications",
-            "webapplication",
-            "webapplikation",
-            "web applikation",
-            "web application development",
-            "webentwicklung",
-            "website",
-            "webseite",
-            "internetangebot",
-            "online portal",
-            "online-portal"
-        ]
-    },
-    {
-        "name": "software_development",
-        "weight": 18,
-        "variants": [
-            "softwareentwicklung",
-            "software-entwicklung",
-            "software development",
-            "entwicklung",
-            "weiterentwicklung",
-            "software engineer",
-            "software engineering",
-            "software solution",
-            "software lösung",
-            "anwendungsentwicklung",
-            "programmierung",
-            "implementation",
-            "implementierung",
-            "custom software",
-            "individuell software"
-        ]
-    },
-    {
         "name": "game_development",
-        "weight": 22,
+        "weight": 20,
         "variants": [
             "game",
             "games",
-            "video game",
-            "video-game",
-            "videospiel",
-            "videospiele",
             "spiel",
             "spiele",
             "game development",
-            "game design",
-            "spielentwicklung",
-            "serious game",
-            "serious games",
-            "lernspiel",
-            "lernspiele",
-            "educational game",
-            "training game",
-            "gamified learning",
-            "escape game",
-            "escape room",
-            "visual novel",
-            "graphic novel",
-            "interactive story",
-            "interactive experience"
-        ]
-    },
-    {
-        "name": "unity",
-        "weight": 24,
-        "variants": [
+            "spieleentwicklung",
             "unity",
-            "unity3d",
-            "unity game",
-            "unity spiel",
-            "unity app",
-            "unity entwicklung",
-            "unity development"
-        ]
-    },
-    {
-        "name": "godot",
-        "weight": 24,
-        "variants": [
             "godot",
-            "godot engine",
-            "godot spiel",
-            "godot game",
-            "godot app",
-            "godot entwicklung",
-            "godot development"
-        ]
+            "game engine",
+            "gamedesign",
+            "interactive game",
+            "serious game",
+            "lernspiel",
+        ],
     },
     {
         "name": "ar_vr_xr",
-        "weight": 24,
+        "weight": 20,
         "variants": [
             "vr",
-            "ar",
-            "xr",
             "virtual reality",
+            "ar",
             "augmented reality",
+            "xr",
             "extended reality",
             "mixed reality",
             "immersive",
-            "immersive experience",
+            "immersiv",
             "3d experience",
-            "3d simulation",
-            "simulation",
-            "vr training",
+            "vr application",
             "ar application",
-            "xr application"
-        ]
+        ],
+    },
+    {
+        "name": "simulation_training",
+        "weight": 18,
+        "variants": [
+            "simulation",
+            "simulator",
+            "training software",
+            "training system",
+            "gamification",
+            "learning app",
+            "lernsoftware",
+            "education software",
+            "edutainment",
+            "interactive learning",
+            "trainingssoftware",
+            "interaktive lernanwendung",
+            "digitale lernerfahrung",
+        ],
+    },
+    {
+        "name": "mobile_app",
+        "weight": 16,
+        "variants": [
+            "mobile app",
+            "app",
+            "app entwicklung",
+            "android app",
+            "ios app",
+            "smartphone app",
+            "mobile application",
+        ],
+    },
+    {
+        "name": "web_app",
+        "weight": 16,
+        "variants": [
+            "web app",
+            "web application",
+            "webseite",
+            "website",
+            "frontend",
+            "backend",
+            "portal",
+            "internetangebot",
+            "online system",
+            "webportal",
+            "online portal",
+            "plattform",
+        ],
+    },
+    {
+        "name": "web_redesign_ux_ui",
+        "weight": 18,
+        "variants": [
+            "redesign",
+            "relaunch",
+            "web redesign",
+            "website redesign",
+            "ux",
+            "ui",
+            "user experience",
+            "user interface",
+            "usability",
+            "frontend design",
+            "interface design",
+            "visuelles design",
+            "webauftritt",
+            "digital experience",
+            "informationsarchitektur",
+        ],
+    },
+    {
+        "name": "software_development",
+        "weight": 16,
+        "variants": [
+            "softwareentwicklung",
+            "software development",
+            "application development",
+            "programmierung",
+            "systementwicklung",
+            "digital solution",
+        ],
+    },
+    {
+        "name": "interactive_systems",
+        "weight": 16,
+        "variants": [
+            "interactive",
+            "interaktiv",
+            "interface",
+            "multimedia",
+            "3d",
+            "animation",
+            "interaktive medien",
+            "interaktive anwendung",
+            "interactive platform",
+            "interactive system",
+        ],
+    },
+    {
+        "name": "visitor_experience_apps",
+        "weight": 16,
+        "variants": [
+            "guide",
+            "audio guide",
+            "besucher",
+            "visitor",
+            "museum app",
+            "zoo app",
+            "tourismus app",
+            "tourism app",
+            "erlebnis",
+            "experience app",
+            "infoterminal",
+            "info app",
+        ],
     },
     {
         "name": "gamification",
-        "weight": 22,
+        "weight": 16,
         "variants": [
             "gamification",
-            "gamifiziert",
-            "gamified",
-            "spielerisch",
+            "serious game",
             "spielbasiert",
-            "game based",
-            "game-based",
-            "interactive learning",
-            "interaktives lernen"
-        ]
-    }
+            "interaktive lernanwendung",
+            "digitale lernerfahrung",
+        ],
+    },
 ]
+
+# =========================================
+# 🟡 MITTEL POSITIVE GRUPPEN
+# =========================================
 
 MEDIUM_POSITIVE_GROUPS = [
     {
-        "name": "digitalization",
-        "weight": 10,
+        "name": "software_general",
+        "weight": 4,
         "variants": [
+            "software",
             "digitalisierung",
-            "digitalisation",
-            "digitalization",
             "digital",
-            "digitale lösung",
-            "digitale loesung",
-            "digitale anwendung",
-            "digitale plattform",
-            "digitale transformation",
-            "transformation",
-            "modernisierung"
-        ]
-    },
-    {
-        "name": "platform_portal",
-        "weight": 10,
-        "variants": [
+            "application",
+            "system",
             "plattform",
-            "platform",
             "portal",
-            "online portal",
-            "digital portal",
-            "kundenerlebnis",
-            "customer experience",
-            "cx",
-            "content platform"
-        ]
+        ],
     },
     {
-        "name": "cloud_saas",
+        "name": "education_learning",
         "weight": 8,
         "variants": [
-            "cloud",
-            "cloudbasiert",
-            "cloud based",
-            "cloud-based",
-            "saas",
-            "software as a service",
-            "software-as-a-service"
-        ]
-    },
-    {
-        "name": "ui_ux_frontend_backend",
-        "weight": 8,
-        "variants": [
-            "frontend",
-            "backend",
-            "ui",
-            "ux",
-            "user interface",
-            "user experience",
-            "responsive",
-            "responsive design",
-            "cms",
-            "content management",
-            "content management system"
-        ]
-    },
-    {
-        "name": "training_learning",
-        "weight": 8,
-        "variants": [
-            "e-learning",
-            "elearning",
+            "bildung",
+            "lernen",
             "lernplattform",
-            "learning platform",
-            "training",
-            "schulungssystem",
-            "digital learning",
-            "interactive training",
-            "interaktives training"
-        ]
+            "unterricht",
+            "didaktik",
+            "edtech",
+            "e learning",
+            "elearning",
+            "lernumgebung",
+            "trainingsumgebung",
+        ],
     },
     {
-        "name": "sap_related",
+        "name": "creative_media",
+        "weight": 8,
+        "variants": [
+            "medien",
+            "multimedia",
+            "visualisierung",
+            "3d modell",
+            "interaktive medien",
+            "content",
+            "animation",
+            "motion design",
+        ],
+    },
+    {
+        "name": "public_experience_context",
         "weight": 6,
         "variants": [
-            "sap",
-            "sap hana",
-            "s/4hana",
-            "s4hana",
-            "sap successfactors",
-            "sap crm",
-            "sap customer experience",
-            "sap utilities"
-        ]
-    }
+            "zoo",
+            "museum",
+            "ausstellung",
+            "tourismus",
+            "tourism",
+            "besucherinformation",
+            "visitor information",
+            "kultur",
+        ],
+    },
 ]
+
+# =========================================
+# 🔴 STARK NEGATIVE GRUPPEN
+# =========================================
 
 STRONG_NEGATIVE_GROUPS = [
     {
-        "name": "construction_road",
+        "name": "sap_erp_enterprise",
         "weight": -22,
         "variants": [
-            "bau",
-            "bauarbeiten",
-            "baustelle",
-            "baugenehmigung",
-            "strasse",
-            "straße",
-            "strassenzustand",
-            "straßenzustand",
-            "strassenbau",
-            "straßenbau",
-            "verkehrsbau"
-        ]
+            "sap",
+            "s4hana",
+            "hana",
+            "sap hana",
+            "sap s4",
+            "successfactors",
+            "erp",
+            "crm",
+            "utilities transformation",
+            "datenmigration",
+            "enterprise resource planning",
+        ],
     },
     {
-        "name": "locks_facility_hardware_delivery",
+        "name": "infrastructure_operations",
         "weight": -20,
         "variants": [
-            "schließanlage",
-            "schliessanlage",
-            "schließsystem",
-            "schliesssystem",
-            "lieferung",
-            "beschaffung",
-            "hardwarebeschaffung",
-            "mobiliar",
-            "moebel",
-            "möbel",
-            "geraete",
-            "geräte"
-        ]
-    },
-    {
-        "name": "network_telephony_infrastructure",
-        "weight": -20,
-        "variants": [
-            "netzwerktechnik",
-            "netzwerk",
-            "festnetzanschluss",
-            "telefonanlage",
             "infrastruktur",
-            "firewall",
-            "ngfw",
-            "ipam",
-            "serverbetrieb",
+            "network",
+            "netzwerk",
+            "server",
+            "hosting",
+            "datacenter",
             "rechenzentrum",
-            "layer 2",
-            "datenanbindung"
-        ]
-    },
-    {
-        "name": "transport_vehicle_sensor",
-        "weight": -20,
-        "variants": [
-            "fahrgastzaehlsystem",
-            "fahrgastzählsystem",
-            "busse",
-            "bus",
-            "öpnv",
-            "oepnv",
-            "fahrzeug",
-            "fahrzeuge",
-            "sensornetzwerk",
-            "verkehrsdatenerhebung",
-            "videosysteme fuer busse",
-            "videosysteme für busse"
-        ]
-    }
-]
-
-MEDIUM_NEGATIVE_GROUPS = [
-    {
-        "name": "maintenance_support_only",
-        "weight": -10,
-        "variants": [
+            "cloud migration",
+            "firewall",
+            "it betrieb",
+            "betrieb",
             "wartung",
             "maintenance",
-            "lizenzverlaengerung",
-            "lizenzverlängerung",
-            "renewal",
             "support",
+            "24x7",
+            "24 7",
+            "lizenz",
+            "lizenzverlaengerung",
+            "renewal",
+            "refresh",
+            "managed service",
+            "managed services",
             "betriebsunterstuetzung",
-            "betriebsunterstützung"
-        ]
+            "sicherstellung des betriebs",
+            "plattformbetrieb",
+            "servicebetrieb",
+        ],
     },
     {
-        "name": "security_admin_only",
-        "weight": -10,
+        "name": "hardware_procurement",
+        "weight": -20,
+        "variants": [
+            "beschaffung",
+            "lieferung",
+            "hardware",
+            "geraete",
+            "videosysteme",
+            "telefonanlage",
+            "monitor",
+            "drucker",
+            "notebook",
+            "laptop",
+            "pc system",
+            "einzelplatzlizenzen",
+        ],
+    },
+    {
+        "name": "construction_facility",
+        "weight": -20,
+        "variants": [
+            "bau",
+            "neubau",
+            "umbau",
+            "liegenschaft",
+            "gebaeudemanagement",
+            "facility management",
+            "cafm",
+            "glt",
+            "schliessanlage",
+            "schliesssystem",
+            "gebaeudeautomation",
+        ],
+    },
+    {
+        "name": "security_networking",
+        "weight": -20,
         "variants": [
             "isms",
             "bcms",
-            "informationssicherheitsmanagement",
-            "it-sicherheit",
-            "itsicherheit",
-            "sicherheit",
-            "datensicherung",
-            "backup",
-            "identity management",
-            "2 faktor authentifizierung",
+            "it sicherheit",
+            "virenschutz",
             "zwei faktor authentifizierung",
-            "two factor authentication"
-        ]
+            "authentifizierung",
+            "wan",
+            "layer 2",
+            "netzwerktechnik",
+            "standortvernetzung",
+            "festnetzanschluesse",
+        ],
     },
     {
-        "name": "postal_printing_archiving",
-        "weight": -10,
+        "name": "enterprise_admin_software",
+        "weight": -18,
         "variants": [
-            "postdienstleistung",
-            "hybrid-post",
-            "druck",
-            "aktendigitalisierung",
-            "papierakten",
-            "archiv",
-            "lagerung von fallakten"
-        ]
-    }
+            "projektportfoliomanagement",
+            "portfoliomanagement",
+            "ppm",
+            "hr software",
+            "personalsoftware",
+            "verwaltungssoftware",
+            "geschaeftsprozesse",
+            "prozessmanagement",
+            "workflow management",
+            "managementsoftware",
+        ],
+    },
 ]
+
+# =========================================
+# 🟠 MITTEL NEGATIVE GRUPPEN
+# =========================================
+
+MEDIUM_NEGATIVE_GROUPS = [
+    {
+        "name": "archive_scan_post",
+        "weight": -14,
+        "variants": [
+            "papierakten",
+            "aktendigitalisierung",
+            "bauaktenarchiv",
+            "aktenarchiv",
+            "archiv",
+            "lagerung",
+            "postdienst",
+            "hybrid post",
+            "hybrid postdienst",
+            "scan service",
+            "digitalisierung von papierakten",
+        ],
+    },
+    {
+        "name": "consulting_only",
+        "weight": -14,
+        "variants": [
+            "consulting",
+            "beratung",
+            "strategy consulting",
+            "prozessberatung",
+            "managementberatung",
+            "beratungs und unterstuetzungsleistungen",
+            "projektbegleitung",
+            "begleitung",
+            "einfuehrung",
+            "etablierung",
+            "kompetenzcenter",
+        ],
+    },
+    {
+        "name": "outsourcing_services",
+        "weight": -12,
+        "variants": [
+            "outsourcing",
+            "it services",
+            "managed services",
+            "betriebsunterstuetzung",
+            "externalisierung",
+        ],
+    },
+    {
+        "name": "other_industries",
+        "weight": -14,
+        "variants": [
+            "reinigung",
+            "entsorgung",
+            "transport",
+            "labor",
+            "medizin",
+            "sicherheitssystem",
+            "post",
+            "logistik",
+            "fahrzeug",
+            "busse",
+            "fahrgastzaehlsystem",
+            "strassenzustand",
+            "ridepooling",
+            "oepnv",
+            "messnetz",
+            "smart city",
+        ],
+    },
+]
+
+# =========================================
+# ⛔ HARTE AUSSCHLUSS-MARKER
+# =========================================
 
 HARD_EXCLUDE_STATUS = [
-    "vergebener auftrag",
-    "ex post veroeffentlichung",
-    "ex post veröffentlichung",
-    "ex ante veroeffentlichung",
-    "ex ante veröffentlichung"
+    "aufgehoben",
+    "eingestellt",
+    "beendet",
+    "nicht vergeben",
+    "vergeben",
+    "zuschlag erteilt",
+    "abgeschlossen",
 ]
+
+# =========================================
+# ⚠️ WEICHE WARNUNGEN
+# =========================================
 
 SOFT_WARNING_STATUS = [
-    "beabsichtigte ausschreibung",
-    "vorinformation"
+    "teilnahmewettbewerb",
+    "verhandlungsverfahren",
+    "nur teilnahmeantrag",
+    "bewerbungsphase",
 ]
 
-MIN_GOOD_DAYS = 14
-MIN_ACCEPTABLE_DAYS = 8
-MIN_BAD_DAYS = 7
+# =========================================
+# 📅 FRIST-BEWERTUNG
+# =========================================
+
+MIN_GOOD_DAYS = 21
+MIN_ACCEPTABLE_DAYS = 10
+MIN_BAD_DAYS = 5

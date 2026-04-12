@@ -72,7 +72,6 @@ def contains_variant(search_text: str, variant: str) -> bool:
 
     padded_text = f" {search_text} "
     padded_variant = f" {normalized_variant} "
-
     return padded_variant in padded_text
 
 
@@ -108,7 +107,6 @@ def parse_deadline(raw_date: str | None):
 
     raw_date = raw_date.strip()
 
-    # Nur Datumsteil nehmen, falls Uhrzeit dabei ist
     match = re.search(r"(\d{2}\.\d{2}\.\d{4})", raw_date)
     if not match:
         return None
@@ -134,7 +132,6 @@ def calculate_deadline_score(tender: dict) -> tuple[int, list[str]]:
 
     today = datetime.now()
     days_left = (deadline - today).days
-
     tender["tage_bis_frist"] = days_left
 
     if days_left >= MIN_GOOD_DAYS:
@@ -150,6 +147,167 @@ def calculate_deadline_score(tender: dict) -> tuple[int, list[str]]:
     return score, reasons
 
 
+def has_any_variant(search_text: str, variants: list[str]) -> tuple[bool, str | None]:
+    for variant in variants:
+        if contains_variant(search_text, variant):
+            return True, variant
+    return False, None
+
+
+def apply_context_rules(tender: dict, search_text: str) -> tuple[int, list[str]]:
+    """
+    Kontextregeln:
+    - generische Treffer abschwächen
+    - echte Kernfälle aufwerten
+    - Enterprise-/Betriebsfälle zusätzlich bestrafen
+    """
+    score_delta = 0
+    reasons = []
+
+    title_text = normalize_text(tender.get("titel", ""))
+
+    # -----------------------------------------
+    # POSITIVE BOOSTS
+    # -----------------------------------------
+
+    app_hit, _ = has_any_variant(search_text, ["app", "mobile app", "android app", "ios app"])
+    app_context_hit, app_context_word = has_any_variant(
+        search_text,
+        [
+            "zoo", "museum", "guide", "audio guide", "visitor", "besucher",
+            "tourismus", "tourism", "interaktiv", "interactive", "multimedia",
+            "learning", "lernen", "edutainment", "gamification", "erlebnis"
+        ]
+    )
+
+    if app_hit and app_context_hit:
+        score_delta += 8
+        reasons.append(f"+8 context_boost_app ({app_context_word})")
+
+    web_hit, _ = has_any_variant(search_text, ["website", "webseite", "web app", "web application", "portal"])
+    web_context_hit, web_context_word = has_any_variant(
+        search_text,
+        [
+            "redesign", "relaunch", "ux", "ui", "usability", "frontend",
+            "interface design", "webauftritt", "digital experience"
+        ]
+    )
+
+    if web_hit and web_context_hit:
+        score_delta += 10
+        reasons.append(f"+10 context_boost_web_ux ({web_context_word})")
+
+    xr_hit, xr_word = has_any_variant(
+        search_text,
+        ["augmented reality", "virtual reality", "xr", "mixed reality", "immersive", "ar", "vr"]
+    )
+    if xr_hit:
+        score_delta += 6
+        reasons.append(f"+6 context_boost_xr ({xr_word})")
+
+    learning_hit, learning_word = has_any_variant(
+        search_text,
+        [
+            "lernsoftware", "learning app", "interactive learning", "edutainment",
+            "gamification", "training software", "training system", "simulation"
+        ]
+    )
+    if learning_hit:
+        score_delta += 6
+        reasons.append(f"+6 context_boost_learning ({learning_word})")
+
+    # -----------------------------------------
+    # NEGATIVE CONTEXT PENALTIES
+    # -----------------------------------------
+
+    operations_hit, operations_word = has_any_variant(
+        search_text,
+        [
+            "betrieb", "wartung", "support", "managed service", "managed services",
+            "sicherstellung des betriebs", "plattformbetrieb", "servicebetrieb",
+            "renewal", "refresh", "lizenz", "lizenzverlaengerung"
+        ]
+    )
+    if operations_hit:
+        score_delta -= 16
+        reasons.append(f"-16 context_penalty_operations ({operations_word})")
+
+    enterprise_hit, enterprise_word = has_any_variant(
+        search_text,
+        [
+            "projektportfoliomanagement", "portfoliomanagement", "ppm",
+            "hr software", "personalsoftware", "verwaltungssoftware",
+            "geschaeftsprozesse", "workflow management", "managementsoftware"
+        ]
+    )
+    if enterprise_hit:
+        score_delta -= 16
+        reasons.append(f"-16 context_penalty_enterprise ({enterprise_word})")
+
+    consulting_hit, consulting_word = has_any_variant(
+        search_text,
+        [
+            "beratung", "consulting", "projektbegleitung",
+            "beratungs und unterstuetzungsleistungen",
+            "einfuehrung", "etablierung", "kompetenzcenter"
+        ]
+    )
+    if consulting_hit:
+        score_delta -= 12
+        reasons.append(f"-12 context_penalty_consulting ({consulting_word})")
+
+    infra_hit, infra_word = has_any_variant(
+        search_text,
+        [
+            "netzwerk", "wan", "layer 2", "server", "rechenzentrum",
+            "virenschutz", "authentifizierung", "it sicherheit", "isms", "bcms"
+        ]
+    )
+    if infra_hit:
+        score_delta -= 18
+        reasons.append(f"-18 context_penalty_infra_security ({infra_word})")
+
+    archive_hit, archive_word = has_any_variant(
+        search_text,
+        ["papierakten", "aktenarchiv", "bauaktenarchiv", "archiv", "scan service", "aktendigitalisierung"]
+    )
+    if archive_hit:
+        score_delta -= 14
+        reasons.append(f"-14 context_penalty_archive ({archive_word})")
+
+    # -----------------------------------------
+    # AMBIGUOUS GENERIC TERMS
+    # "entwicklung" nicht blind positiv
+    # -----------------------------------------
+
+    generic_dev_hit, generic_dev_word = has_any_variant(search_text, ["entwicklung"])
+    dev_bad_context_hit, dev_bad_context_word = has_any_variant(
+        search_text,
+        ["strategische entwicklung", "projektbegleitung", "smart city", "messnetz", "beratung"]
+    )
+
+    if generic_dev_hit and dev_bad_context_hit:
+        score_delta -= 10
+        reasons.append(f"-10 context_penalty_generic_entwicklung ({dev_bad_context_word})")
+
+    # -----------------------------------------
+    # TITLE-ONLY BOOSTS
+    # -----------------------------------------
+
+    title_positive_hit, title_positive_word = has_any_variant(
+        title_text,
+        [
+            "zoo app", "museum app", "augmented reality", "virtual reality",
+            "serious game", "gamification", "redesign", "relaunch"
+        ]
+    )
+    if title_positive_hit:
+        score_delta += 8
+        reasons.append(f"+8 title_boost ({title_positive_word})")
+
+    return score_delta, reasons
+
+
 def check_hard_exclusions(tender: dict, search_text: str) -> str | None:
     status_text = normalize_text(
         " ".join([
@@ -163,7 +321,6 @@ def check_hard_exclusions(tender: dict, search_text: str) -> str | None:
         if contains_variant(status_text, marker):
             return f"Harter Ausschluss wegen Status/Vergabeart: {marker}"
 
-    # klare fachliche Ausschlüsse über dominante Negativsignale
     title_text = normalize_text(tender.get("titel", ""))
 
     hard_negative_title_markers = [
@@ -175,6 +332,10 @@ def check_hard_exclusions(tender: dict, search_text: str) -> str | None:
         "telefonanlage",
         "busse",
         "fahrzeug",
+        "wan",
+        "layer 2",
+        "virenschutz",
+        "zwei faktor authentifizierung",
     ]
 
     for marker in hard_negative_title_markers:
@@ -184,28 +345,64 @@ def check_hard_exclusions(tender: dict, search_text: str) -> str | None:
     return None
 
 
-def classify_tender(score: int, positive_hits: list[str], negative_hits: list[str], hard_exclusion: str | None) -> str:
+def has_soft_warning(tender: dict, search_text: str) -> tuple[bool, str | None]:
+    status_text = normalize_text(
+        " ".join([
+            str(tender.get("status_detail", "")),
+            str(tender.get("vergabeart_detail", "")),
+            str(tender.get("vergabeart", "")),
+        ])
+    )
+
+    for marker in SOFT_WARNING_STATUS:
+        if contains_variant(status_text, marker):
+            return True, marker
+
+    return False, None
+
+
+def classify_tender(
+    score: int,
+    positive_hits: list[str],
+    negative_hits: list[str],
+    hard_exclusion: str | None
+) -> str:
     if hard_exclusion:
         return "NICHT_PASSEND"
 
-    # wenn mindestens ein starker positiver Themen-Treffer da ist und Score hoch genug
-    strong_thematic_groups = {
+    strong_core_groups = {
+        "game_development",
+        "ar_vr_xr",
+        "simulation_training",
         "mobile_app",
         "web_app",
-        "software_development",
-        "game_development",
-        "unity",
-        "godot",
-        "ar_vr_xr",
-        "gamification"
+        "web_redesign_ux_ui",
+        "interactive_systems",
+        "visitor_experience_apps",
+        "gamification",
     }
 
-    has_strong_positive_theme = any(hit in strong_thematic_groups for hit in positive_hits)
+    heavy_negative_groups = {
+        "sap_erp_enterprise",
+        "infrastructure_operations",
+        "hardware_procurement",
+        "construction_facility",
+        "security_networking",
+        "enterprise_admin_software",
+    }
 
-    if has_strong_positive_theme and score >= 28:
+    has_strong_core = any(hit in strong_core_groups for hit in positive_hits)
+    has_heavy_negative = any(hit in heavy_negative_groups for hit in negative_hits)
+
+    # Echte Kernprojekte dürfen schneller passend werden,
+    # aber nicht wenn starke Negativthemen gleichzeitig da sind.
+    if has_strong_core and not has_heavy_negative and score >= 24:
         return "PASSEND"
 
-    if score >= 12:
+    if has_strong_core and has_heavy_negative:
+        return "MANUELL_PRUEFEN"
+
+    if score >= 14:
         return "MANUELL_PRUEFEN"
 
     return "NICHT_PASSEND"
@@ -214,12 +411,21 @@ def classify_tender(score: int, positive_hits: list[str], negative_hits: list[st
 def score_tender(tender: dict) -> dict:
     search_text = build_search_text(tender)
 
-    positive_score_1, positive_hits_1, positive_reasons_1 = evaluate_groups(search_text, STRONG_POSITIVE_GROUPS)
-    positive_score_2, positive_hits_2, positive_reasons_2 = evaluate_groups(search_text, MEDIUM_POSITIVE_GROUPS)
+    positive_score_1, positive_hits_1, positive_reasons_1 = evaluate_groups(
+        search_text, STRONG_POSITIVE_GROUPS
+    )
+    positive_score_2, positive_hits_2, positive_reasons_2 = evaluate_groups(
+        search_text, MEDIUM_POSITIVE_GROUPS
+    )
 
-    negative_score_1, negative_hits_1, negative_reasons_1 = evaluate_groups(search_text, STRONG_NEGATIVE_GROUPS)
-    negative_score_2, negative_hits_2, negative_reasons_2 = evaluate_groups(search_text, MEDIUM_NEGATIVE_GROUPS)
+    negative_score_1, negative_hits_1, negative_reasons_1 = evaluate_groups(
+        search_text, STRONG_NEGATIVE_GROUPS
+    )
+    negative_score_2, negative_hits_2, negative_reasons_2 = evaluate_groups(
+        search_text, MEDIUM_NEGATIVE_GROUPS
+    )
 
+    context_score, context_reasons = apply_context_rules(tender, search_text)
     hard_exclusion = check_hard_exclusions(tender, search_text)
 
     deadline_score, deadline_reasons = calculate_deadline_score(tender)
@@ -229,6 +435,7 @@ def score_tender(tender: dict) -> dict:
         + positive_score_2
         + negative_score_1
         + negative_score_2
+        + context_score
         + deadline_score
     )
 
@@ -240,8 +447,13 @@ def score_tender(tender: dict) -> dict:
         + positive_reasons_2
         + negative_reasons_1
         + negative_reasons_2
+        + context_reasons
         + deadline_reasons
     )
+
+    soft_warning, soft_warning_marker = has_soft_warning(tender, search_text)
+    if soft_warning:
+        reasons.insert(0, f"SOFT_WARNING: {soft_warning_marker}")
 
     if hard_exclusion:
         reasons.insert(0, f"HARTER_AUSSCHLUSS: {hard_exclusion}")
