@@ -39,7 +39,7 @@
     "final_verfahrensangaben_url": "https://www.evergabe.nrw.de/VMPSatellite/public/company/project/CXS9YYDYTQQV6SQ5/de/processdata/generic?1",
     "verarbeitung_status": "vollständig",
     "datenquelle_typ": "mit_verfahrensangaben",
-    "tage_bis_frist": 0,
+    "tage_bis_frist": -1,
     "scoring_text": "relaunch support und hosting website ruhrtriennale 2027 2029 uvgo ausschreibung oeffentliche ausschreibung uvgo kultur ruhr gmbh 72243000 0",
     "score": -6,
     "positive_hits": [
@@ -58,7 +58,7 @@
       "+10 context_boost_web_ux (relaunch)",
       "-16 context_penalty_operations (support)",
       "+5 title_web_boost (relaunch + website)",
-      "-25 zu kurze Frist (0 Tage)"
+      "-25 zu kurze Frist (-1 Tage)"
     ],
     "hard_exclusion_reason": null,
     "non_actionable_reason": null,
@@ -104,7 +104,7 @@
     "final_verfahrensangaben_url": "https://evergabe.blb.nrw.de/Vergabe/public/company/project/CXS7YYXYT7QSLFGN/de/processdata/generic?1",
     "verarbeitung_status": "vollständig",
     "datenquelle_typ": "mit_verfahrensangaben",
-    "tage_bis_frist": 8,
+    "tage_bis_frist": 7,
     "scoring_text": "blb nrw muenster ms fhs vr hueffer campus neubau fh glt aufschaltung 060 26 00117 vob a ausschreibung oeffentliche ausschreibung vob a bau und liegenschaftsbetrieb nrw muenster 48921000 0",
     "score": -10,
     "positive_hits": [
@@ -162,7 +162,7 @@
     "final_verfahrensangaben_url": "https://www.evergabe.nrw.de/VMPSatellite/public/company/project/CXS7YM6YTGFDQQH2/de/processdata/generic?1",
     "verarbeitung_status": "vollständig",
     "datenquelle_typ": "mit_verfahrensangaben",
-    "tage_bis_frist": 13,
+    "tage_bis_frist": 12,
     "scoring_text": "erstellung betrieb und betreuung eines internetangebots als basis fuer ein digitales gedenkbuch und eine webseite zur praesentation des projekts verfolgungsbiografien des landtags nordrhein westfalen sei ein mensch uvgo ausschreibung oeffentliche ausschreibung uvgo der praesident des landtags nordrhein westfalen 72000000 5",
     "score": -15,
     "positive_hits": [
@@ -175,7 +175,7 @@
       "+16 web_app (webseite)",
       "-20 infrastructure_operations (betrieb)",
       "-16 context_penalty_operations (betrieb)",
-      "+5 akzeptable Frist (13 Tage)"
+      "+5 akzeptable Frist (12 Tage)"
     ],
     "hard_exclusion_reason": null,
     "non_actionable_reason": null,

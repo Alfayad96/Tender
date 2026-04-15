@@ -39,7 +39,7 @@
     "final_verfahrensangaben_url": "https://www.vmp-rheinland.de/VMPSatellite/public/company/project/CXPTY6ZD3GT/de/processdata/eforms",
     "verarbeitung_status": "vollständig",
     "datenquelle_typ": "mit_verfahrensangaben",
-    "tage_bis_frist": 17,
+    "tage_bis_frist": 16,
     "scoring_text": "zoo app koelner zoo vgv ausschreibung offenes verfahren vgv ag zoologischer garten koeln 72000000 5",
     "score": 59,
     "positive_hits": [
@@ -54,7 +54,7 @@
       "+6 public_experience_context (zoo)",
       "+8 context_boost_app (zoo)",
       "+8 title_boost (zoo app)",
-      "+5 akzeptable Frist (17 Tage)"
+      "+5 akzeptable Frist (16 Tage)"
     ],
     "hard_exclusion_reason": null,
     "non_actionable_reason": null,

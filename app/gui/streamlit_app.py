@@ -1,6 +1,3 @@
-import os
-import sys
-import subprocess
 import streamlit as st
 
 from app.services.tender_service import (
@@ -12,14 +9,15 @@ from app.services.tender_service import (
     sort_tenders,
 )
 
+from run import main as run_marktscan
+from run_scoring import main as run_relevanzanalyse
+
+
 st.set_page_config(
     page_title="Tender Radar",
     page_icon="📡",
     layout="wide"
 )
-
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-PYTHON_EXE = sys.executable
 
 
 def safe_value(value, fallback="—"):
@@ -45,86 +43,11 @@ def init_session_state():
     if "nicht_passend" not in st.session_state:
         st.session_state.nicht_passend = []
 
+    if "scan_running" not in st.session_state:
+        st.session_state.scan_running = False
 
-def parse_status_line(line: str):
-    if not line.startswith("STATUS|"):
-        return None
-
-    data = {}
-    parts = line.strip().split("|")[1:]
-
-    for part in parts:
-        if "=" in part:
-            key, value = part.split("=", 1)
-            data[key.strip()] = value.strip()
-
-    return data
-
-
-def format_status(data: dict) -> str:
-    phase = data.get("phase", "")
-    message = data.get("message", "")
-    current = data.get("current")
-    total = data.get("total")
-    count = data.get("count")
-    total_pages = data.get("total_pages")
-
-    if message:
-        return message
-
-    if phase == "start":
-        return "Prozess wurde gestartet ..."
-    if phase == "search":
-        return "Ausschreibungen werden gesucht ..."
-    if phase == "pages_found":
-        return f"{total_pages} Seiten wurden gefunden."
-    if phase == "page_progress":
-        return f"Seite {current} von {total} wird geladen ..."
-    if phase == "tenders_found":
-        return f"{count} Ausschreibungen wurden gefunden."
-    if phase == "collecting":
-        return "Ausschreibungen werden jetzt geholt und verarbeitet ..."
-    if phase == "detail_loading":
-        return "Detailseiten werden geladen ..."
-    if phase == "verfahrens_loading":
-        return "Verfahrensangaben werden geladen ..."
-    if phase == "item_progress":
-        return f"Ausschreibung {current} von {total} wird verarbeitet ..."
-    if phase == "scoring_start":
-        return "Analyse wurde gestartet ..."
-    if phase == "scoring_loading":
-        return "Bewertbare Daten werden geladen ..."
-    if phase == "scoring_mit":
-        return "Ausschreibungen mit Verfahrensangaben werden bewertet ..."
-    if phase == "scoring_ohne":
-        return "Ausschreibungen ohne Verfahrensangaben werden bewertet ..."
-    if phase == "sorting":
-        return "Ergebnisse werden sortiert ..."
-    if phase == "saving":
-        return "Dateien werden gespeichert ..."
-    if phase == "done":
-        return "Prozess abgeschlossen."
-    if phase == "error":
-        return "Ein Fehler ist aufgetreten."
-
-    return "Prozess läuft ..."
-
-
-def get_progress(data: dict):
-    phase = data.get("phase", "")
-    current = data.get("current")
-    total = data.get("total")
-
-    if phase in {"page_progress", "item_progress"} and current and total:
-        try:
-            current_int = int(current)
-            total_int = int(total)
-            if total_int > 0:
-                return int((current_int / total_int) * 100)
-        except ValueError:
-            return None
-
-    return None
+    if "analyse_running" not in st.session_state:
+        st.session_state.analyse_running = False
 
 
 def clear_session_results():
@@ -149,66 +72,36 @@ def load_results_into_session():
     st.session_state.daten_geladen = True
 
 
-def run_script_live(script_name: str, title: str):
-    script_path = os.path.join(BASE_DIR, script_name)
-
-    if not os.path.exists(script_path):
-        st.error(f"Datei nicht gefunden: {script_path}")
-        return False
-
-    st.subheader(title)
-
-    status_box = st.empty()
-    progress_bar = st.progress(0)
-    log_box = st.empty()
-
-    output_lines = []
-    last_progress = 0
+def run_marktscan_live():
+    st.subheader("Marktscan")
+    info_box = st.empty()
 
     try:
-        process = subprocess.Popen(
-            [PYTHON_EXE, "-u", script_path],
-            cwd=BASE_DIR,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1
-        )
-
-        for line in iter(process.stdout.readline, ""):
-            if not line:
-                break
-
-            clean_line = line.rstrip()
-            output_lines.append(clean_line)
-
-            status_data = parse_status_line(clean_line)
-
-            if status_data:
-                status_box.info(format_status(status_data))
-
-                progress = get_progress(status_data)
-                if progress is not None:
-                    progress_bar.progress(progress)
-                    last_progress = progress
-
-            log_box.code("\n".join(output_lines[-6:]), language="bash")
-
-        process.wait()
-
-        if process.returncode == 0:
-            if last_progress < 100:
-                progress_bar.progress(100)
-
-            status_box.success(f"{title} erfolgreich abgeschlossen.")
-            return True
-
-        status_box.error(f"{title} wurde mit Fehler beendet.")
-        return False
-
+        info_box.info("Marktscan läuft ... Das kann einige Minuten dauern.")
+        run_marktscan()
+        info_box.success("Marktscan erfolgreich abgeschlossen.")
+        return True
     except Exception as e:
-        st.error(f"Fehler beim Starten: {e}")
+        info_box.error(f"Fehler beim Marktscan: {e}")
         return False
+    finally:
+        st.session_state.scan_running = False
+
+
+def run_relevanzanalyse_live():
+    st.subheader("Analyse")
+    info_box = st.empty()
+
+    try:
+        info_box.info("Relevanzanalyse läuft ...")
+        run_relevanzanalyse()
+        info_box.success("Analyse erfolgreich abgeschlossen.")
+        return True
+    except Exception as e:
+        info_box.error(f"Fehler bei der Analyse: {e}")
+        return False
+    finally:
+        st.session_state.analyse_running = False
 
 
 def render_links(tender: dict):
@@ -321,34 +214,56 @@ def main():
         st.write(f"**Nicht aktiv:** {len(st.session_state.nicht_aktiv)}")
         st.write(f"**Nicht passend:** {len(st.session_state.nicht_passend)}")
 
+    irgendwas_laeuft = st.session_state.scan_running or st.session_state.analyse_running
+
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        if st.button("📡 Marktscan", use_container_width=True):
-            clear_session_results()
-            success = run_script_live("run.py", "Marktscan")
-            if success:
-                st.info("Marktscan abgeschlossen. Bitte jetzt Relevanz analysieren ausführen.")
+        if st.button(
+            "📡 Marktscan",
+            use_container_width=True,
+            disabled=irgendwas_laeuft
+        ):
+            st.session_state.scan_running = True
+            st.rerun()
 
     with col2:
-        if st.button("🎯 Relevanz analysieren", use_container_width=True):
-            success = run_script_live("run_scoring.py", "Analyse")
-            if success:
-                load_results_into_session()
-                st.session_state.has_current_run_results = True
+        if st.button(
+            "🎯 Relevanz analysieren",
+            use_container_width=True,
+            disabled=irgendwas_laeuft
+        ):
+            st.session_state.analyse_running = True
+            st.rerun()
 
     with col3:
-        if st.button("🔄 Neu laden", use_container_width=True):
-            if st.session_state.has_current_run_results:
-                load_results_into_session()
-                st.success("Ergebnisse dieser aktuellen Sitzung wurden neu geladen.")
-            else:
-                st.warning("In dieser Sitzung wurden noch keine neuen Ergebnisse erzeugt. Bitte zuerst Marktscan und Relevanz analysieren ausführen.")
+        if st.button(
+            "🔄 Neu laden",
+            use_container_width=True,
+            disabled=irgendwas_laeuft
+        ):
+            load_results_into_session()
+            st.session_state.has_current_run_results = True
+            st.success("Ergebnisse wurden neu geladen.")
+
+    if st.session_state.scan_running:
+        clear_session_results()
+        success = run_marktscan_live()
+        if success:
+            st.info("Marktscan abgeschlossen. Bitte jetzt Relevanz analysieren ausführen.")
+        st.rerun()
+
+    if st.session_state.analyse_running:
+        success = run_relevanzanalyse_live()
+        if success:
+            load_results_into_session()
+            st.session_state.has_current_run_results = True
+        st.rerun()
 
     st.divider()
 
     if not st.session_state.daten_geladen:
-        st.info("Noch keine neuen Ergebnisse geladen. Bitte zuerst Marktscan und danach Relevanz analysieren ausführen.")
+        st.info("Noch keine Ergebnisse geladen. Bitte zuerst Marktscan und danach Relevanz analysieren ausführen.")
         return
 
     passende = sort_tenders(
