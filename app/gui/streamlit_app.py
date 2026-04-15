@@ -1,4 +1,6 @@
+import io
 import streamlit as st
+from contextlib import redirect_stdout, redirect_stderr
 
 from app.services.tender_service import (
     load_passende_tender,
@@ -13,11 +15,40 @@ from run import main as run_marktscan
 from run_scoring import main as run_relevanzanalyse
 
 
+# =========================================
+# LOGIN-DATEN
+# =========================================
+APP_USERNAME = "qm"
+APP_PASSWORD = "1234"
+
+
 st.set_page_config(
     page_title="Tender Radar",
     page_icon="📡",
     layout="wide"
 )
+
+
+def check_login():
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+
+    if not st.session_state.logged_in:
+        st.title("🔐 Login erforderlich")
+        st.caption("Bitte mit den Zugangsdaten anmelden, um Tender Radar zu öffnen.")
+
+        username = st.text_input("Benutzername")
+        password = st.text_input("Passwort", type="password")
+
+        if st.button("Login", use_container_width=True):
+            if username == APP_USERNAME and password == APP_PASSWORD:
+                st.session_state.logged_in = True
+                st.success("Login erfolgreich.")
+                st.rerun()
+            else:
+                st.error("Falscher Benutzername oder falsches Passwort.")
+
+        st.stop()
 
 
 def safe_value(value, fallback="—"):
@@ -49,6 +80,12 @@ def init_session_state():
     if "analyse_running" not in st.session_state:
         st.session_state.analyse_running = False
 
+    if "scan_done_message" not in st.session_state:
+        st.session_state.scan_done_message = ""
+
+    if "analyse_done_message" not in st.session_state:
+        st.session_state.analyse_done_message = ""
+
 
 def clear_session_results():
     st.session_state.passende = []
@@ -72,34 +109,138 @@ def load_results_into_session():
     st.session_state.daten_geladen = True
 
 
-def run_marktscan_live():
-    st.subheader("Marktscan")
-    info_box = st.empty()
+def parse_status_line(line: str):
+    line = line.strip()
+
+    if line.startswith("STATUS:"):
+        return {"type": "status", "message": line.replace("STATUS:", "", 1).strip()}
+
+    if line.startswith("FORTSCHRITT:"):
+        return {"type": "progress_text", "message": line.replace("FORTSCHRITT:", "", 1).strip()}
+
+    return None
+
+
+def extract_progress_percent(line: str):
+    line = line.strip()
+
+    if "Seite" in line and "von" in line and "wird geladen" in line:
+        # Beispiel: FORTSCHRITT: Seite 3 von 12 wird geladen ...
+        parts = line.split()
+        try:
+            current = int(parts[2])
+            total = int(parts[4])
+            if total > 0:
+                return int((current / total) * 100)
+        except Exception:
+            return None
+
+    if "[" in line and "/" in line and "]" in line:
+        # Beispiel: FORTSCHRITT: [8/143] Verarbeite: ...
+        try:
+            start = line.index("[") + 1
+            end = line.index("]")
+            current_str, total_str = line[start:end].split("/")
+            current = int(current_str)
+            total = int(total_str)
+            if total > 0:
+                return int((current / total) * 100)
+        except Exception:
+            return None
+
+    return None
+
+
+class StreamlitLogWriter(io.TextIOBase):
+    def __init__(self, status_box, progress_bar, log_box):
+        self.status_box = status_box
+        self.progress_bar = progress_bar
+        self.log_box = log_box
+        self.buffer = ""
+        self.lines = []
+        self.last_progress = 0
+
+    def write(self, text):
+        if not text:
+            return 0
+
+        self.buffer += text
+
+        while "\n" in self.buffer:
+            line, self.buffer = self.buffer.split("\n", 1)
+            clean_line = line.rstrip()
+
+            if clean_line:
+                self.lines.append(clean_line)
+
+                parsed = parse_status_line(clean_line)
+                if parsed:
+                    self.status_box.info(parsed["message"])
+
+                progress = extract_progress_percent(clean_line)
+                if progress is not None:
+                    self.last_progress = progress
+                    self.progress_bar.progress(progress)
+
+                self.log_box.code("\n".join(self.lines[-12:]), language="bash")
+
+        return len(text)
+
+    def flush(self):
+        if self.buffer.strip():
+            clean_line = self.buffer.rstrip()
+            self.lines.append(clean_line)
+
+            parsed = parse_status_line(clean_line)
+            if parsed:
+                self.status_box.info(parsed["message"])
+
+            progress = extract_progress_percent(clean_line)
+            if progress is not None:
+                self.last_progress = progress
+                self.progress_bar.progress(progress)
+
+            self.log_box.code("\n".join(self.lines[-12:]), language="bash")
+
+        self.buffer = ""
+
+
+def run_with_live_output(fn, title: str):
+    st.subheader(title)
+
+    status_box = st.empty()
+    progress_bar = st.progress(0)
+    log_box = st.empty()
+
+    writer = StreamlitLogWriter(status_box, progress_bar, log_box)
 
     try:
-        info_box.info("Marktscan läuft ... Das kann einige Minuten dauern.")
-        run_marktscan()
-        info_box.success("Marktscan erfolgreich abgeschlossen.")
+        status_box.info(f"{title} läuft ...")
+        with redirect_stdout(writer), redirect_stderr(writer):
+            fn()
+
+        writer.flush()
+        progress_bar.progress(100)
+        status_box.success(f"{title} erfolgreich abgeschlossen.")
         return True
     except Exception as e:
-        info_box.error(f"Fehler beim Marktscan: {e}")
+        writer.flush()
+        status_box.error(f"{title} wurde mit Fehler beendet: {e}")
         return False
+
+
+def run_marktscan_live():
+    try:
+        success = run_with_live_output(run_marktscan, "Marktscan")
+        return success
     finally:
         st.session_state.scan_running = False
 
 
 def run_relevanzanalyse_live():
-    st.subheader("Analyse")
-    info_box = st.empty()
-
     try:
-        info_box.info("Relevanzanalyse läuft ...")
-        run_relevanzanalyse()
-        info_box.success("Analyse erfolgreich abgeschlossen.")
-        return True
-    except Exception as e:
-        info_box.error(f"Fehler bei der Analyse: {e}")
-        return False
+        success = run_with_live_output(run_relevanzanalyse, "Relevanzanalyse")
+        return success
     finally:
         st.session_state.analyse_running = False
 
@@ -194,13 +335,26 @@ def render_section(title: str, tenders: list[dict]):
 
 
 def main():
+    check_login()
     init_session_state()
 
     st.title("📡 Tender Radar")
     st.caption("Suche, Analyse und Bewertung von Ausschreibungen für QM Interactive")
 
+    if st.session_state.scan_done_message:
+        st.success(st.session_state.scan_done_message)
+        st.session_state.scan_done_message = ""
+
+    if st.session_state.analyse_done_message:
+        st.success(st.session_state.analyse_done_message)
+        st.session_state.analyse_done_message = ""
+
     with st.sidebar:
         st.header("Filter")
+
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.logged_in = False
+            st.rerun()
 
         search_term = st.text_input("Suche")
         sort_option = st.selectbox(
@@ -250,7 +404,7 @@ def main():
         clear_session_results()
         success = run_marktscan_live()
         if success:
-            st.info("Marktscan abgeschlossen. Bitte jetzt Relevanz analysieren ausführen.")
+            st.session_state.scan_done_message = "Marktscan ist fertig."
         st.rerun()
 
     if st.session_state.analyse_running:
@@ -258,6 +412,7 @@ def main():
         if success:
             load_results_into_session()
             st.session_state.has_current_run_results = True
+            st.session_state.analyse_done_message = "Relevanzanalyse ist fertig."
         st.rerun()
 
     st.divider()
