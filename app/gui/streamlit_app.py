@@ -1,4 +1,5 @@
 import io
+import re
 import streamlit as st
 from contextlib import redirect_stdout, redirect_stderr
 
@@ -15,9 +16,6 @@ from run import main as run_marktscan
 from run_scoring import main as run_relevanzanalyse
 
 
-# =========================================
-# LOGIN-DATEN
-# =========================================
 APP_USERNAME = "qm"
 APP_PASSWORD = "1234"
 
@@ -56,35 +54,24 @@ def safe_value(value, fallback="—"):
 
 
 def init_session_state():
-    if "daten_geladen" not in st.session_state:
-        st.session_state.daten_geladen = False
+    defaults = {
+        "daten_geladen": False,
+        "has_current_run_results": False,
+        "passende": [],
+        "manuell": [],
+        "nicht_aktiv": [],
+        "nicht_passend": [],
+        "scan_running": False,
+        "analyse_running": False,
+        "scan_done_message": "",
+        "analyse_done_message": "",
+        "scan_found_count": 0,
+        "analyse_processed_count": 0,
+    }
 
-    if "has_current_run_results" not in st.session_state:
-        st.session_state.has_current_run_results = False
-
-    if "passende" not in st.session_state:
-        st.session_state.passende = []
-
-    if "manuell" not in st.session_state:
-        st.session_state.manuell = []
-
-    if "nicht_aktiv" not in st.session_state:
-        st.session_state.nicht_aktiv = []
-
-    if "nicht_passend" not in st.session_state:
-        st.session_state.nicht_passend = []
-
-    if "scan_running" not in st.session_state:
-        st.session_state.scan_running = False
-
-    if "analyse_running" not in st.session_state:
-        st.session_state.analyse_running = False
-
-    if "scan_done_message" not in st.session_state:
-        st.session_state.scan_done_message = ""
-
-    if "analyse_done_message" not in st.session_state:
-        st.session_state.analyse_done_message = ""
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 
 def clear_session_results():
@@ -94,6 +81,8 @@ def clear_session_results():
     st.session_state.nicht_passend = []
     st.session_state.daten_geladen = False
     st.session_state.has_current_run_results = False
+    st.session_state.scan_found_count = 0
+    st.session_state.analyse_processed_count = 0
 
 
 def load_results_into_session():
@@ -109,140 +98,110 @@ def load_results_into_session():
     st.session_state.daten_geladen = True
 
 
-def parse_status_line(line: str):
-    line = line.strip()
-
-    if line.startswith("STATUS:"):
-        return {"type": "status", "message": line.replace("STATUS:", "", 1).strip()}
-
-    if line.startswith("FORTSCHRITT:"):
-        return {"type": "progress_text", "message": line.replace("FORTSCHRITT:", "", 1).strip()}
-
-    return None
+def total_loaded_tenders():
+    return (
+        len(st.session_state.passende)
+        + len(st.session_state.manuell)
+        + len(st.session_state.nicht_aktiv)
+        + len(st.session_state.nicht_passend)
+    )
 
 
-def extract_progress_percent(line: str):
-    line = line.strip()
+def extract_number_from_output(output: str):
+    patterns = [
+        r"(\d+)\s+Ausschreibungen",
+        r"Ausschreibungen\s*[:=]\s*(\d+)",
+        r"Gefunden\s*[:=]\s*(\d+)",
+        r"Bearbeitet\s*[:=]\s*(\d+)",
+        r"Gesamt\s*[:=]\s*(\d+)",
+    ]
 
-    if "Seite" in line and "von" in line and "wird geladen" in line:
-        # Beispiel: FORTSCHRITT: Seite 3 von 12 wird geladen ...
-        parts = line.split()
-        try:
-            current = int(parts[2])
-            total = int(parts[4])
-            if total > 0:
-                return int((current / total) * 100)
-        except Exception:
-            return None
+    for pattern in patterns:
+        match = re.search(pattern, output, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
 
-    if "[" in line and "/" in line and "]" in line:
-        # Beispiel: FORTSCHRITT: [8/143] Verarbeite: ...
-        try:
-            start = line.index("[") + 1
-            end = line.index("]")
-            current_str, total_str = line[start:end].split("/")
-            current = int(current_str)
-            total = int(total_str)
-            if total > 0:
-                return int((current / total) * 100)
-        except Exception:
-            return None
-
-    return None
+    return 0
 
 
-class StreamlitLogWriter(io.TextIOBase):
-    def __init__(self, status_box, progress_bar, log_box):
-        self.status_box = status_box
-        self.progress_bar = progress_bar
-        self.log_box = log_box
-        self.buffer = ""
-        self.lines = []
-        self.last_progress = 0
-
-    def write(self, text):
-        if not text:
-            return 0
-
-        self.buffer += text
-
-        while "\n" in self.buffer:
-            line, self.buffer = self.buffer.split("\n", 1)
-            clean_line = line.rstrip()
-
-            if clean_line:
-                self.lines.append(clean_line)
-
-                parsed = parse_status_line(clean_line)
-                if parsed:
-                    self.status_box.info(parsed["message"])
-
-                progress = extract_progress_percent(clean_line)
-                if progress is not None:
-                    self.last_progress = progress
-                    self.progress_bar.progress(progress)
-
-                self.log_box.code("\n".join(self.lines[-12:]), language="bash")
-
-        return len(text)
-
-    def flush(self):
-        if self.buffer.strip():
-            clean_line = self.buffer.rstrip()
-            self.lines.append(clean_line)
-
-            parsed = parse_status_line(clean_line)
-            if parsed:
-                self.status_box.info(parsed["message"])
-
-            progress = extract_progress_percent(clean_line)
-            if progress is not None:
-                self.last_progress = progress
-                self.progress_bar.progress(progress)
-
-            self.log_box.code("\n".join(self.lines[-12:]), language="bash")
-
-        self.buffer = ""
-
-
-def run_with_live_output(fn, title: str):
-    st.subheader(title)
-
-    status_box = st.empty()
-    progress_bar = st.progress(0)
-    log_box = st.empty()
-
-    writer = StreamlitLogWriter(status_box, progress_bar, log_box)
+def run_silent(fn):
+    output_buffer = io.StringIO()
 
     try:
-        status_box.info(f"{title} läuft ...")
-        with redirect_stdout(writer), redirect_stderr(writer):
+        with redirect_stdout(output_buffer), redirect_stderr(output_buffer):
             fn()
 
-        writer.flush()
-        progress_bar.progress(100)
-        status_box.success(f"{title} erfolgreich abgeschlossen.")
-        return True
+        output = output_buffer.getvalue()
+        return True, output, None
+
     except Exception as e:
-        writer.flush()
-        status_box.error(f"{title} wurde mit Fehler beendet: {e}")
-        return False
+        output = output_buffer.getvalue()
+        return False, output, str(e)
 
 
-def run_marktscan_live():
+def run_marktscan_silent():
     try:
-        success = run_with_live_output(run_marktscan, "Marktscan")
+        success, output, error = run_silent(run_marktscan)
+
+        if success:
+            found_count = extract_number_from_output(output)
+            st.session_state.scan_found_count = found_count
+            st.session_state.scan_done_message = (
+                f"Marktscan ist fertig. Gefundene Ausschreibungen: {found_count}"
+                if found_count > 0
+                else "Marktscan ist fertig."
+            )
+        else:
+            st.session_state.scan_done_message = f"Marktscan wurde mit Fehler beendet: {error}"
+
         return success
+
     finally:
         st.session_state.scan_running = False
 
 
-def run_relevanzanalyse_live():
+def run_relevanzanalyse_silent():
     try:
-        success = run_with_live_output(run_relevanzanalyse, "Relevanzanalyse")
+        success, output, error = run_silent(run_relevanzanalyse)
+
+        if success:
+            load_results_into_session()
+            processed_count = total_loaded_tenders()
+
+            if processed_count == 0:
+                processed_count = extract_number_from_output(output)
+
+            st.session_state.analyse_processed_count = processed_count
+            st.session_state.has_current_run_results = True
+
+            st.session_state.analyse_done_message = (
+                f"Relevanzanalyse ist fertig. Bearbeitete Ausschreibungen: {processed_count}"
+            )
+        else:
+            st.session_state.analyse_done_message = (
+                f"Relevanzanalyse wurde mit Fehler beendet: {error}"
+            )
+
         return success
+
     finally:
         st.session_state.analyse_running = False
+
+
+def render_result_summary():
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.metric(
+            "Gefundene Ausschreibungen",
+            st.session_state.scan_found_count
+        )
+
+    with col2:
+        st.metric(
+            "Bearbeitete Ausschreibungen",
+            st.session_state.analyse_processed_count
+        )
 
 
 def render_links(tender: dict):
@@ -349,6 +308,8 @@ def main():
         st.success(st.session_state.analyse_done_message)
         st.session_state.analyse_done_message = ""
 
+    render_result_summary()
+
     with st.sidebar:
         st.header("Filter")
 
@@ -398,21 +359,16 @@ def main():
         ):
             load_results_into_session()
             st.session_state.has_current_run_results = True
+            st.session_state.analyse_processed_count = total_loaded_tenders()
             st.success("Ergebnisse wurden neu geladen.")
 
     if st.session_state.scan_running:
         clear_session_results()
-        success = run_marktscan_live()
-        if success:
-            st.session_state.scan_done_message = "Marktscan ist fertig."
+        run_marktscan_silent()
         st.rerun()
 
     if st.session_state.analyse_running:
-        success = run_relevanzanalyse_live()
-        if success:
-            load_results_into_session()
-            st.session_state.has_current_run_results = True
-            st.session_state.analyse_done_message = "Relevanzanalyse ist fertig."
+        run_relevanzanalyse_silent()
         st.rerun()
 
     st.divider()
