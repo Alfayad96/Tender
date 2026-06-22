@@ -156,6 +156,19 @@ class StreamlitLogWriter(io.TextIOBase):
         self.buffer = ""
         self.last_progress = 0
 
+    def show_current_line(self, line: str):
+        parsed = parse_status_line(line)
+
+        if parsed:
+            self.status_box.info(parsed["message"])
+        else:
+            self.status_box.info(line)
+
+        progress = extract_progress_percent(line)
+        if progress is not None:
+            self.last_progress = progress
+            self.progress_bar.progress(progress)
+
     def write(self, text):
         if not text:
             return 0
@@ -164,34 +177,17 @@ class StreamlitLogWriter(io.TextIOBase):
 
         while "\n" in self.buffer:
             line, self.buffer = self.buffer.split("\n", 1)
-            clean_line = line.rstrip()
+            clean_line = line.strip()
 
             if clean_line:
-                parsed = parse_status_line(clean_line)
-
-                if parsed:
-                    self.status_box.info(parsed["message"])
-
-                progress = extract_progress_percent(clean_line)
-                if progress is not None:
-                    self.last_progress = progress
-                    self.progress_bar.progress(progress)
+                self.show_current_line(clean_line)
 
         return len(text)
 
     def flush(self):
         if self.buffer.strip():
-            clean_line = self.buffer.rstrip()
-
-            parsed = parse_status_line(clean_line)
-
-            if parsed:
-                self.status_box.info(parsed["message"])
-
-            progress = extract_progress_percent(clean_line)
-            if progress is not None:
-                self.last_progress = progress
-                self.progress_bar.progress(progress)
+            clean_line = self.buffer.strip()
+            self.show_current_line(clean_line)
 
         self.buffer = ""
 
