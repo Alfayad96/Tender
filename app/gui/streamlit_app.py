@@ -217,20 +217,25 @@ def run_with_live_output(fn, title: str):
         return False
 
 
-def run_marktscan_live():
-    try:
-        success = run_with_live_output(run_marktscan, "Marktscan")
-        return success
-    finally:
-        st.session_state.scan_running = False
+def run_full_search():
+    clear_session_results()
 
+    success_scan = run_with_live_output(run_marktscan, "Marktscan")
 
-def run_relevanzanalyse_live():
-    try:
-        success = run_with_live_output(run_relevanzanalyse, "Relevanzanalyse")
-        return success
-    finally:
-        st.session_state.analyse_running = False
+    if not success_scan:
+        return False
+
+    st.info("Marktscan ist fertig. Ausschreibungen werden analysiert ...")
+
+    success_analyse = run_with_live_output(run_relevanzanalyse, "Relevanzanalyse")
+
+    if not success_analyse:
+        return False
+
+    load_results_into_session()
+    st.session_state.has_current_run_results = True
+    st.session_state.scan_done_message = "Ausschreibungen wurden gefunden und analysiert."
+    return True
 
 
 def render_links(tender: dict):
@@ -358,55 +363,24 @@ def main():
 
     irgendwas_laeuft = st.session_state.scan_running or st.session_state.analyse_running
 
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        if st.button(
-            "📡 Marktscan",
-            use_container_width=True,
-            disabled=irgendwas_laeuft
-        ):
-            st.session_state.scan_running = True
-            st.rerun()
-
-    with col2:
-        if st.button(
-            "🎯 Relevanz analysieren",
-            use_container_width=True,
-            disabled=irgendwas_laeuft
-        ):
-            st.session_state.analyse_running = True
-            st.rerun()
-
-    with col3:
-        if st.button(
-            "🔄 Neu laden",
-            use_container_width=True,
-            disabled=irgendwas_laeuft
-        ):
-            load_results_into_session()
-            st.session_state.has_current_run_results = True
-            st.success("Ergebnisse wurden neu geladen.")
-
-    if st.session_state.scan_running:
-        clear_session_results()
-        success = run_marktscan_live()
-        if success:
-            st.session_state.scan_done_message = "Marktscan ist fertig."
+    if st.button(
+        "🔎 Ausschreibungen finden",
+        use_container_width=True,
+        disabled=irgendwas_laeuft
+    ):
+        st.session_state.scan_running = True
         st.rerun()
 
-    if st.session_state.analyse_running:
-        success = run_relevanzanalyse_live()
-        if success:
-            load_results_into_session()
-            st.session_state.has_current_run_results = True
-            st.session_state.analyse_done_message = "Relevanzanalyse ist fertig."
+    if st.session_state.scan_running:
+        run_full_search()
+        st.session_state.scan_running = False
+        st.session_state.analyse_running = False
         st.rerun()
 
     st.divider()
 
     if not st.session_state.daten_geladen:
-        st.info("Noch keine Ergebnisse geladen. Bitte zuerst Marktscan und danach Relevanz analysieren ausführen.")
+        st.info("Noch keine Ergebnisse geladen. Bitte auf „Ausschreibungen finden“ klicken.")
         return
 
     passende = sort_tenders(
