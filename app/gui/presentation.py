@@ -1,6 +1,8 @@
 """Pure presentation helpers for the Streamlit frontend."""
 
+import re
 from collections.abc import Iterable
+from datetime import date
 from typing import Any
 
 
@@ -23,6 +25,10 @@ NON_DEADLINE_TEXT_VALUES = {
     "ergebnis",
     "frühere bekanntmachung zu diesem verfahren",
 }
+
+DEADLINE_PREFIX = re.compile(
+    r"^(?:\d{1,2}\.\d{1,2}\.\d{4}|\d{4}-\d{2}-\d{2})(?:\b|[ T])"
+)
 
 
 def has_display_value(value: Any) -> bool:
@@ -50,14 +56,20 @@ def first_display_value(*values: Any) -> Any:
 
 
 def display_deadline(*values: Any) -> Any:
-    """Return the first real deadline while ignoring notice-type labels."""
+    """Return the first date-like deadline while ignoring scraped notice text."""
 
     for value in values:
         if not has_display_value(value):
             continue
-        if isinstance(value, str) and value.strip().casefold() in NON_DEADLINE_TEXT_VALUES:
+        if isinstance(value, date):
+            return value
+        if not isinstance(value, str):
             continue
-        return value
+        normalized = value.strip().strip('"').strip()
+        if normalized.casefold() in NON_DEADLINE_TEXT_VALUES:
+            continue
+        if DEADLINE_PREFIX.match(normalized):
+            return value
     return None
 
 

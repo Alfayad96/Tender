@@ -49,7 +49,12 @@ class PresentationHelpersTest(unittest.TestCase):
     def test_notice_type_labels_are_not_rendered_as_deadlines(self):
         self.assertIsNone(display_deadline("Ergebnis"))
         self.assertIsNone(display_deadline("Frühere Bekanntmachung zu diesem Verfahren"))
+        self.assertIsNone(display_deadline("Teilnahmeanträge"))
+        self.assertIsNone(display_deadline("- Öffnung der Teilnahmeanträge 14.09.2026"))
+        self.assertIsNone(display_deadline("Längerer Verfahrenshinweis ohne Frist"))
         self.assertEqual(display_deadline("05.09.2026"), "05.09.2026")
+        self.assertEqual(display_deadline("05.09.2026 12:00 Uhr"), "05.09.2026 12:00 Uhr")
+        self.assertEqual(display_deadline("2026-09-05"), "2026-09-05")
         self.assertEqual(display_deadline("Ergebnis", "05.09.2026"), "05.09.2026")
 
 
