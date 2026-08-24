@@ -1,4 +1,8 @@
+import base64
 import io
+from html import escape
+from pathlib import Path
+
 import streamlit as st
 from contextlib import redirect_stdout, redirect_stderr
 
@@ -13,6 +17,7 @@ from app.services.tender_service import (
 
 from run import main as run_marktscan
 from run_scoring import main as run_relevanzanalyse
+from app.gui.presentation import display_items, first_display_value, has_display_value
 
 
 # =========================================
@@ -20,6 +25,9 @@ from run_scoring import main as run_relevanzanalyse
 # =========================================
 APP_USERNAME = "qm"
 APP_PASSWORD = "1234"
+
+ASSET_DIR = Path(__file__).resolve().parent / "assets"
+BRAND_MARK = ASSET_DIR / "tender-radar-mark.svg"
 
 
 st.set_page_config(
@@ -29,30 +37,252 @@ st.set_page_config(
 )
 
 
+def inject_styles():
+    st.markdown(
+        """
+        <style>
+        .block-container {
+            max-width: 1180px;
+            padding-top: 2.25rem;
+            padding-bottom: 4rem;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+            gap: 0.9rem;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            border-color: rgba(128, 128, 128, 0.22);
+            border-radius: 1rem;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+        }
+
+        .stButton > button,
+        .stLinkButton > a {
+            min-height: 2.7rem;
+            border-radius: 0.65rem;
+            font-weight: 600;
+        }
+
+        .stButton > button[kind="primary"] {
+            border-color: #2f80ed;
+            background: #2f80ed;
+            color: #ffffff;
+        }
+
+        .stButton > button[kind="primary"]:hover {
+            border-color: #1f6fd8;
+            background: #1f6fd8;
+            color: #ffffff;
+        }
+
+        .stButton > button:focus-visible,
+        .stLinkButton > a:focus-visible {
+            outline: 3px solid rgba(64, 153, 255, 0.38);
+            outline-offset: 2px;
+        }
+
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 0.4rem;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 0.6rem 0.6rem 0 0;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        [data-testid="stMetric"] {
+            padding: 0.8rem 0.9rem;
+            border: 1px solid rgba(128, 128, 128, 0.2);
+            border-radius: 0.75rem;
+        }
+
+        .tender-status {
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            margin: 0.1rem 0 0.65rem;
+            padding: 0.25rem 0.65rem;
+            border: 1px solid rgba(128, 128, 128, 0.28);
+            border-radius: 999px;
+            background: rgba(128, 128, 128, 0.1);
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .brand-header,
+        .empty-state {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .brand-header {
+            margin: 0.15rem 0 1.4rem;
+        }
+
+        .brand-header img {
+            width: 64px;
+            height: 64px;
+            flex: 0 0 64px;
+        }
+
+        .brand-header h1,
+        .empty-state h3 {
+            margin: 0;
+            padding: 0;
+        }
+
+        .brand-header p,
+        .empty-state p {
+            margin: 0.3rem 0 0;
+            color: rgba(128, 128, 128, 0.95);
+        }
+
+        .empty-state {
+            padding: 0.45rem 0.2rem;
+        }
+
+        .empty-state img {
+            width: 54px;
+            height: 54px;
+            flex: 0 0 54px;
+        }
+
+        .tender-meta {
+            margin: 0.15rem 0 0.7rem;
+            line-height: 1.45;
+        }
+
+        .tender-meta-label {
+            display: block;
+            margin-bottom: 0.12rem;
+            color: rgba(128, 128, 128, 0.95);
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.035em;
+            text-transform: uppercase;
+        }
+
+        .tender-meta-value {
+            overflow-wrap: anywhere;
+            font-weight: 550;
+        }
+
+        .tender-reasons {
+            margin-top: 0.25rem;
+            margin-bottom: 1rem;
+            padding-left: 1.25rem;
+        }
+
+        .tender-reasons li {
+            margin: 0.25rem 0;
+        }
+
+        hr {
+            margin-top: 1.7rem !important;
+            margin-bottom: 1.7rem !important;
+        }
+
+        @media (max-width: 640px) {
+            .block-container {
+                padding-top: 3.75rem;
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            .stTabs [data-baseweb="tab"] {
+                padding-left: 0.65rem;
+                padding-right: 0.65rem;
+            }
+
+            .brand-header {
+                align-items: flex-start;
+            }
+
+            .brand-header img {
+                width: 52px;
+                height: 52px;
+                flex-basis: 52px;
+            }
+
+            .brand-header h1 {
+                font-size: 2rem;
+                line-height: 1.1;
+            }
+
+            .empty-state {
+                align-items: flex-start;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def check_login():
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
 
     if not st.session_state.logged_in:
-        st.title("🔐 Login erforderlich")
-        st.caption("Bitte mit den Zugangsdaten anmelden, um Tender Radar zu öffnen.")
+        left, center, right = st.columns([1, 1.15, 1])
+        with center:
+            with st.container(border=True):
+                st.image(str(BRAND_MARK), width=60)
+                st.title("Willkommen")
+                st.caption("Bei Tender Radar anmelden")
 
-        username = st.text_input("Benutzername")
-        password = st.text_input("Passwort", type="password")
+                username = st.text_input("Benutzername")
+                password = st.text_input("Passwort", type="password")
 
-        if st.button("Login", use_container_width=True):
-            if username == APP_USERNAME and password == APP_PASSWORD:
-                st.session_state.logged_in = True
-                st.success("Login erfolgreich.")
-                st.rerun()
-            else:
-                st.error("Falscher Benutzername oder falsches Passwort.")
+                if st.button("Login", use_container_width=True, type="primary"):
+                    if username == APP_USERNAME and password == APP_PASSWORD:
+                        st.session_state.logged_in = True
+                        st.success("Login erfolgreich.")
+                        st.rerun()
+                    else:
+                        st.error("Falscher Benutzername oder falsches Passwort.")
 
         st.stop()
 
 
-def safe_value(value, fallback="—"):
-    return fallback if value in (None, "") else value
+def brand_mark_data_uri() -> str:
+    encoded = base64.b64encode(BRAND_MARK.read_bytes()).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
+
+
+def render_brand_header():
+    st.markdown(
+        f"""
+        <div class="brand-header">
+            <img src="{brand_mark_data_uri()}" alt="Tender Radar Logo">
+            <div>
+                <h1>Tender Radar</h1>
+                <p>Suche, Analyse und Bewertung von Ausschreibungen für QM Interactive</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_initial_empty_state():
+    with st.container(border=True):
+        st.markdown(
+            f"""
+            <div class="empty-state">
+                <img src="{brand_mark_data_uri()}" alt="">
+                <div>
+                    <h3>Bereit für den nächsten Marktscan</h3>
+                    <p>Starte die Suche, um aktuelle Ausschreibungen zu sammeln und nach Relevanz zu bewerten.</p>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def init_session_state():
@@ -238,82 +468,170 @@ def run_full_search():
     return True
 
 
-def render_links(tender: dict):
-    detail_url = tender.get("final_detail_url") or tender.get("detail_url")
-    verfahrens_url = tender.get("final_verfahrensangaben_url") or tender.get("verfahrensangaben_url")
-    externe_url = tender.get("externe_info_url")
+def available_links(tender: dict) -> list[tuple[str, str]]:
+    links = [
+        (
+            "Zur Ausschreibung",
+            first_display_value(tender.get("final_detail_url"), tender.get("detail_url")),
+        ),
+        (
+            "Verfahrensangaben",
+            first_display_value(
+                tender.get("final_verfahrensangaben_url"),
+                tender.get("verfahrensangaben_url"),
+            ),
+        ),
+        ("Externe Infos", tender.get("externe_info_url")),
+    ]
+    return [(label, url) for label, url in links if has_display_value(url)]
 
-    col1, col2, col3 = st.columns(3)
 
-    with col1:
-        if detail_url:
-            st.link_button("Zur Ausschreibung", detail_url, use_container_width=True)
+def render_links(links: list[tuple[str, str]]):
+    if not links:
+        return
 
-    with col2:
-        if verfahrens_url:
-            st.link_button("Verfahrensangaben", verfahrens_url, use_container_width=True)
+    columns = st.columns(len(links))
+    for column, (label, url) in zip(columns, links):
+        with column:
+            st.link_button(label, url, use_container_width=True)
 
-    with col3:
-        if externe_url:
-            st.link_button("Externe Infos", externe_url, use_container_width=True)
+
+def render_metadata(items: list[tuple[str, object]]):
+    visible_items = [(label, value) for label, value in items if has_display_value(value)]
+
+    for index in range(0, len(visible_items), 2):
+        row = visible_items[index : index + 2]
+        columns = st.columns(len(row))
+        for column, (label, value) in zip(columns, row):
+            with column:
+                st.markdown(
+                    (
+                        '<div class="tender-meta">'
+                        f'<span class="tender-meta-label">{escape(label)}</span>'
+                        f'<span class="tender-meta-value">{escape(str(value).strip())}</span>'
+                        "</div>"
+                    ),
+                    unsafe_allow_html=True,
+                )
+
+
+def readable_tag(value: object) -> str:
+    return str(value).replace("_", " ").strip()
+
+
+def readable_status(value: object) -> str:
+    labels = {
+        "PASSEND": "Passend",
+        "MANUELL_PRUEFEN": "Manuell prüfen",
+        "NICHT_AKTIV_BEREITS_VERGEBEN": "Nicht aktiv",
+        "NICHT_PASSEND": "Nicht passend",
+    }
+    raw_value = str(value).strip()
+    return labels.get(raw_value, readable_tag(raw_value).title())
 
 
 def render_tender_card(tender: dict):
-    titel = safe_value(tender.get("titel"))
-    score = safe_value(tender.get("score"))
-    bewertung = safe_value(tender.get("bewertung"))
-    auftraggeber = safe_value(tender.get("auftraggeber"))
-    frist = safe_value(
-        tender.get("abgabefrist_detail")
-        or tender.get("angebots_teilnahmefrist")
-        or tender.get("frist")
+    titel = tender.get("titel")
+    score = tender.get("score")
+    bewertung = tender.get("bewertung")
+    auftraggeber = first_display_value(
+        tender.get("auftraggeber"),
+        tender.get("auftraggeber_name"),
+        tender.get("stelle_bezeichnung"),
     )
-    ausschreibungs_id = safe_value(tender.get("ausschreibungs_id"))
-    vergabe_nr = safe_value(tender.get("vergabe_nr"))
-    ort = safe_value(tender.get("ort"))
-    beschreibung = safe_value(tender.get("beschreibung_leistung"))
-    positive_hits = tender.get("positive_hits", [])
-    negative_hits = tender.get("negative_hits", [])
-    score_reasons = tender.get("score_reasons", [])
+    frist = first_display_value(
+        tender.get("abgabefrist_detail"),
+        tender.get("angebots_teilnahmefrist"),
+        tender.get("teilnahmefrist"),
+        tender.get("frist"),
+    )
+    ort = first_display_value(tender.get("ort"), tender.get("postleitzahl"))
+    beschreibung = first_display_value(
+        tender.get("beschreibung_leistung"),
+        tender.get("auftragsgegenstand_text"),
+    )
+    cpv = first_display_value(
+        tender.get("auftragsgegenstand_detail"),
+        tender.get("auftragsgegenstand_code"),
+    )
+    positive_hits = display_items(tender.get("positive_hits"))
+    negative_hits = display_items(tender.get("negative_hits"))
+    score_reasons = display_items(tender.get("score_reasons"))
+    links = available_links(tender)
+
+    metadata = [
+        ("Frist", frist),
+        ("Veröffentlicht", tender.get("veroeffentlichung")),
+        ("Ausschreibungs-ID", tender.get("ausschreibungs_id")),
+        ("Vergabe-Nr.", tender.get("vergabe_nr")),
+        (
+            "Vergabeart",
+            first_display_value(tender.get("vergabeart_detail"), tender.get("vergabeart")),
+        ),
+        ("Status", tender.get("status_detail")),
+        ("Ort", ort),
+        ("CPV / Leistungsbereich", cpv),
+    ]
 
     with st.container(border=True):
-        col1, col2 = st.columns([4, 1])
+        if has_display_value(score):
+            content_column, score_column = st.columns([5, 1])
+        else:
+            content_column = st.container()
+            score_column = None
 
-        with col1:
-            st.subheader(titel)
-            st.write(f"**Bewertung:** {bewertung}")
-            st.write(f"**Auftraggeber:** {auftraggeber}")
+        with content_column:
+            if has_display_value(titel):
+                st.subheader(str(titel).strip())
 
-        with col2:
-            st.metric("Score", score)
+            if has_display_value(bewertung):
+                status = readable_status(bewertung)
+                st.markdown(
+                    f'<span class="tender-status">{escape(status)}</span>',
+                    unsafe_allow_html=True,
+                )
 
-        info1, info2 = st.columns(2)
+            if has_display_value(auftraggeber):
+                st.caption(f"Auftraggeber · {str(auftraggeber).strip()}")
 
-        with info1:
-            st.write(f"**Frist:** {frist}")
-            st.write(f"**Ausschreibungs-ID:** {ausschreibungs_id}")
+        if score_column is not None:
+            with score_column:
+                st.metric("Score", score)
 
-        with info2:
-            st.write(f"**Vergabe-Nr.:** {vergabe_nr}")
-            st.write(f"**Ort:** {ort}")
+        render_metadata(metadata)
 
-        with st.expander("Details"):
-            st.write(f"**Beschreibung:** {beschreibung}")
+        has_details = (
+            has_display_value(beschreibung)
+            or bool(positive_hits)
+            or bool(negative_hits)
+            or bool(score_reasons)
+            or bool(links)
+        )
+        if has_details:
+            with st.expander("Details & Links"):
+                if has_display_value(beschreibung):
+                    st.markdown("**Beschreibung**")
+                    st.write(str(beschreibung).strip())
 
-            st.write("**Positive Hits:**")
-            st.write(", ".join(positive_hits) if positive_hits else "—")
+                if positive_hits:
+                    st.markdown("**Positive Signale**")
+                    st.write(", ".join(readable_tag(item) for item in positive_hits))
 
-            st.write("**Negative Hits:**")
-            st.write(", ".join(negative_hits) if negative_hits else "—")
+                if negative_hits:
+                    st.markdown("**Negative Signale**")
+                    st.write(", ".join(readable_tag(item) for item in negative_hits))
 
-            st.write("**Score-Gründe:**")
-            if score_reasons:
-                for reason in score_reasons:
-                    st.write(f"- {reason}")
-            else:
-                st.write("—")
+                if score_reasons:
+                    st.markdown("**Bewertungsgründe**")
+                    reasons = "".join(
+                        f"<li>{escape(str(reason).strip())}</li>" for reason in score_reasons
+                    )
+                    st.markdown(
+                        f'<ul class="tender-reasons">{reasons}</ul>',
+                        unsafe_allow_html=True,
+                    )
 
-            render_links(tender)
+                render_links(links)
 
 
 def render_section(title: str, tenders: list[dict]):
@@ -328,11 +646,11 @@ def render_section(title: str, tenders: list[dict]):
 
 
 def main():
+    inject_styles()
     check_login()
     init_session_state()
 
-    st.title("📡 Tender Radar")
-    st.caption("Suche, Analyse und Bewertung von Ausschreibungen für QM Interactive")
+    render_brand_header()
 
     if st.session_state.scan_done_message:
         st.success(st.session_state.scan_done_message)
@@ -349,24 +667,32 @@ def main():
             st.session_state.logged_in = False
             st.rerun()
 
-        search_term = st.text_input("Suche")
+        search_term = st.text_input(
+            "Suche",
+            placeholder="Titel, Auftraggeber oder ID",
+        )
         sort_option = st.selectbox(
             "Sortierung",
             ["Score absteigend", "Score aufsteigend", "Frist", "Titel A-Z"]
         )
 
         st.divider()
-        st.write(f"**Passend:** {len(st.session_state.passende)}")
-        st.write(f"**Manuell prüfen:** {len(st.session_state.manuell)}")
-        st.write(f"**Nicht aktiv:** {len(st.session_state.nicht_aktiv)}")
-        st.write(f"**Nicht passend:** {len(st.session_state.nicht_passend)}")
+        st.caption("ERGEBNISÜBERSICHT")
+        stats_left, stats_right = st.columns(2)
+        with stats_left:
+            st.metric("Passend", len(st.session_state.passende))
+            st.metric("Nicht aktiv", len(st.session_state.nicht_aktiv))
+        with stats_right:
+            st.metric("Manuell", len(st.session_state.manuell))
+            st.metric("Nicht passend", len(st.session_state.nicht_passend))
 
     irgendwas_laeuft = st.session_state.scan_running or st.session_state.analyse_running
 
     if st.button(
         "🔎 Ausschreibungen finden",
         use_container_width=True,
-        disabled=irgendwas_laeuft
+        disabled=irgendwas_laeuft,
+        type="primary",
     ):
         st.session_state.scan_running = True
         st.rerun()
@@ -380,7 +706,7 @@ def main():
     st.divider()
 
     if not st.session_state.daten_geladen:
-        st.info("Noch keine Ergebnisse geladen. Bitte auf „Ausschreibungen finden“ klicken.")
+        render_initial_empty_state()
         return
 
     passende = sort_tenders(
