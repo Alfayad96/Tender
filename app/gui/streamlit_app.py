@@ -258,53 +258,13 @@ def credentials_match(username: str, password: str) -> bool:
 
 
 def check_login():
+    # TEMPORÄR: Login komplett deaktiviert — die Session wird als eingeloggt markiert.
+    # Nur lokal verwenden. Nicht in Produktion oder ins Repo pushen.
     if "logged_in" not in st.session_state:
-        st.session_state.logged_in = False
-
-    if not st.session_state.logged_in:
-        left, center, right = st.columns([1, 1.15, 1])
-        with center:
-            with st.container(border=True):
-                st.markdown(
-                    (
-                        f'<img class="login-brand-mark" src="{brand_mark_data_uri()}" '
-                        'alt="Tender Radar Logo">'
-                    ),
-                    unsafe_allow_html=True,
-                )
-                st.title("Willkommen")
-                st.caption("Bei Tender Radar anmelden")
-
-                expected_username, expected_password = login_credentials()
-                if not expected_username or not expected_password:
-                    st.error(
-                        "Die Anmeldung ist momentan nicht verfügbar.",
-                        icon=":material/lock:",
-                    )
-                    st.stop()
-
-                with st.form("login_form", clear_on_submit=True, border=False):
-                    username = st.text_input("Benutzername")
-                    password = st.text_input("Passwort", type="password")
-                    login_submitted = st.form_submit_button(
-                        "Anmelden",
-                        icon=":material/login:",
-                        use_container_width=True,
-                        type="primary",
-                    )
-
-                if login_submitted:
-                    if credentials_match(username, password):
-                        st.session_state.logged_in = True
-                        st.success("Login erfolgreich.", icon=":material/check_circle:")
-                        st.rerun()
-                    else:
-                        st.error(
-                            "Falscher Benutzername oder falsches Passwort.",
-                            icon=":material/error:",
-                        )
-
-        st.stop()
+        st.session_state.logged_in = True
+    else:
+        st.session_state.logged_in = True
+    return
 
 
 def brand_mark_data_uri() -> str:
