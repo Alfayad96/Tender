@@ -1,6 +1,6 @@
 import re
 import unicodedata
-from datetime import datetime
+from datetime import date, datetime
 
 from app.services.scoring_config import (
     STRONG_POSITIVE_GROUPS,
@@ -89,6 +89,46 @@ def evaluate_groups(search_text: str, groups: list[dict]) -> tuple[int, list[str
         matched_variant = None
         for variant in variants:
             if contains_variant(search_text, variant):
+                normalized_variant = normalize_text(variant)
+
+                # "web app" must not also count as a mobile app merely because
+                # it contains the generic token "app".
+                if group_name == "mobile_app" and normalized_variant == "app":
+                    text_without_web_apps = re.sub(r"\bweb\s+app\b", " ", search_text)
+                    if not contains_variant(text_without_web_apps, "app"):
+                        continue
+
+                # Short AR/VR acronyms occur in building project codes. Require
+                # them to be free of an obvious construction context unless an
+                # explicit extended-reality term is also present.
+                if group_name == "ar_vr_xr" and normalized_variant in {"ar", "vr"}:
+                    construction_context = any(
+                        contains_variant(search_text, marker)
+                        for marker in [
+                            "bau",
+                            "neubau",
+                            "umbau",
+                            "glt",
+                            "gebaeudeautomation",
+                            "facility management",
+                            "cafm",
+                            "elektrotechnik",
+                            "schwachstrom",
+                        ]
+                    )
+                    explicit_xr_context = any(
+                        contains_variant(search_text, marker)
+                        for marker in [
+                            "virtual reality",
+                            "augmented reality",
+                            "mixed reality",
+                            "extended reality",
+                            "immersive",
+                        ]
+                    )
+                    if construction_context and not explicit_xr_context:
+                        continue
+
                 matched_variant = variant
                 break
 
@@ -118,7 +158,10 @@ def parse_deadline(raw_date: str | None):
         return None
 
 
-def calculate_deadline_score(tender: dict) -> tuple[int, list[str]]:
+def calculate_deadline_score(
+    tender: dict,
+    today: date | None = None,
+) -> tuple[int, list[str]]:
     reasons = []
     score = 0
 
@@ -131,8 +174,8 @@ def calculate_deadline_score(tender: dict) -> tuple[int, list[str]]:
     if not deadline:
         return score, reasons
 
-    today = datetime.now()
-    days_left = (deadline - today).days
+    today_date = today or date.today()
+    days_left = (deadline.date() - today_date).days
     tender["tage_bis_frist"] = days_left
 
     if days_left >= MIN_GOOD_DAYS:
@@ -200,7 +243,7 @@ def apply_context_rules(tender: dict, search_text: str) -> tuple[int, list[str]]
         search_text,
         [
             "bau", "neubau", "umbau", "glt", "aufschaltung",
-            "gebaeudeautomation", "liegenschaft", "campus",
+            "gebaeudeautomation", "liegenschaft",
             "facility management", "cafm", "schliesssystem",
             "schliessanlage", "elektrotechnik", "schwachstrom"
         ]
@@ -239,8 +282,37 @@ def apply_context_rules(tender: dict, search_text: str) -> tuple[int, list[str]]
         ]
     )
     if operations_hit:
-        score_delta -= 16
-        reasons.append(f"-16 context_penalty_operations ({operations_word})")
+        delivery_action_hit, _ = has_any_variant(
+            search_text,
+            [
+                "entwicklung",
+                "implementierung",
+                "erstellung",
+                "neuentwicklung",
+                "relaunch",
+                "redesign",
+            ],
+        )
+        digital_product_hit, _ = has_any_variant(
+            search_text,
+            [
+                "app",
+                "website",
+                "webseite",
+                "web app",
+                "web application",
+                "internetangebot",
+                "portal",
+                "software",
+            ],
+        )
+
+        if delivery_action_hit and digital_product_hit:
+            score_delta -= 6
+            reasons.append(f"-6 context_penalty_mixed_operations ({operations_word})")
+        else:
+            score_delta -= 16
+            reasons.append(f"-16 context_penalty_operations ({operations_word})")
 
     enterprise_hit, enterprise_word = has_any_variant(
         search_text,
@@ -260,7 +332,7 @@ def apply_context_rules(tender: dict, search_text: str) -> tuple[int, list[str]]
         [
             "beratung", "consulting", "projektbegleitung",
             "beratungs und unterstuetzungsleistungen",
-            "einfuehrung", "etablierung", "kompetenzcenter"
+            "etablierung", "kompetenzcenter"
         ]
     )
     if consulting_hit:
@@ -444,7 +516,7 @@ def classify_tender(
     if has_strong_core and not has_heavy_negative and score >= 24:
         return "PASSEND"
 
-    if has_strong_core and has_heavy_negative:
+    if has_strong_core and has_heavy_negative and score >= 14:
         return "MANUELL_PRUEFEN"
 
     if score >= 14:
@@ -477,6 +549,18 @@ def score_tender(tender: dict) -> dict:
     # Frist nur bei aktiven Verfahren werten
     if not hard_exclusion and not non_actionable_marker:
         deadline_score, deadline_reasons = calculate_deadline_score(tender)
+
+        deadline_value = parse_deadline(
+            tender.get("abgabefrist_detail")
+            or tender.get("angebots_teilnahmefrist")
+            or tender.get("frist")
+        )
+        if (
+            deadline_value
+            and tender.get("tage_bis_frist") is not None
+            and tender["tage_bis_frist"] < 0
+        ):
+            non_actionable_marker = "frist abgelaufen"
     else:
         deadline_score, deadline_reasons = 0, []
 
