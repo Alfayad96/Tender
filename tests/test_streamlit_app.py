@@ -3,8 +3,27 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
+from app.gui.streamlit_app import available_links
+
 
 class StreamlitFrontendTest(unittest.TestCase):
+    def test_available_links_have_consistent_material_icons(self):
+        links = available_links(
+            {
+                "final_detail_url": "https://example.com/tender",
+                "verfahrensangaben_url": "https://example.com/process",
+                "externe_info_url": "N/A",
+            }
+        )
+
+        self.assertEqual(
+            links,
+            [
+                ("Zur Ausschreibung", "https://example.com/tender", ":material/open_in_new:"),
+                ("Verfahrensangaben", "https://example.com/process", ":material/description:"),
+            ],
+        )
+
     def test_card_hides_missing_fields_and_preserves_zero_score(self):
         app_path = Path(__file__).parents[1] / "app" / "gui" / "streamlit_app.py"
         app = AppTest.from_file(str(app_path), default_timeout=20)

@@ -1,6 +1,11 @@
 import unittest
 
-from app.gui.presentation import display_items, first_display_value, has_display_value
+from app.gui.presentation import (
+    display_deadline,
+    display_items,
+    first_display_value,
+    has_display_value,
+)
 
 
 class PresentationHelpersTest(unittest.TestCase):
@@ -40,6 +45,12 @@ class PresentationHelpersTest(unittest.TestCase):
     def test_display_items_removes_empty_entries(self):
         self.assertEqual(display_items(["mobile_app", " ", None, "N/A"]), ["mobile_app"])
         self.assertEqual(display_items(None), [])
+
+    def test_notice_type_labels_are_not_rendered_as_deadlines(self):
+        self.assertIsNone(display_deadline("Ergebnis"))
+        self.assertIsNone(display_deadline("Frühere Bekanntmachung zu diesem Verfahren"))
+        self.assertEqual(display_deadline("05.09.2026"), "05.09.2026")
+        self.assertEqual(display_deadline("Ergebnis", "05.09.2026"), "05.09.2026")
 
 
 if __name__ == "__main__":

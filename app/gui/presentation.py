@@ -19,6 +19,11 @@ MISSING_TEXT_VALUES = {
     "undefined",
 }
 
+NON_DEADLINE_TEXT_VALUES = {
+    "ergebnis",
+    "frühere bekanntmachung zu diesem verfahren",
+}
+
 
 def has_display_value(value: Any) -> bool:
     """Return whether a value contains information worth showing in the UI.
@@ -42,6 +47,18 @@ def first_display_value(*values: Any) -> Any:
     """Return the first displayable value, or ``None`` when none exists."""
 
     return next((value for value in values if has_display_value(value)), None)
+
+
+def display_deadline(*values: Any) -> Any:
+    """Return the first real deadline while ignoring notice-type labels."""
+
+    for value in values:
+        if not has_display_value(value):
+            continue
+        if isinstance(value, str) and value.strip().casefold() in NON_DEADLINE_TEXT_VALUES:
+            continue
+        return value
+    return None
 
 
 def display_items(items: Iterable[Any] | None) -> list[Any]:

@@ -1,5 +1,7 @@
 import base64
+import hmac
 import io
+import os
 from html import escape
 from pathlib import Path
 
@@ -17,22 +19,23 @@ from app.services.tender_service import (
 
 from run import main as run_marktscan
 from run_scoring import main as run_relevanzanalyse
-from app.gui.presentation import display_items, first_display_value, has_display_value
+from app.gui.presentation import (
+    display_deadline,
+    display_items,
+    first_display_value,
+    has_display_value,
+)
 
-
-# =========================================
-# LOGIN-DATEN
-# =========================================
-APP_USERNAME = "qm"
-APP_PASSWORD = "1234"
 
 ASSET_DIR = Path(__file__).resolve().parent / "assets"
 BRAND_MARK = ASSET_DIR / "tender-radar-mark.svg"
+USERNAME_ENV = "TENDER_RADAR_USERNAME"
+PASSWORD_ENV = "TENDER_RADAR_PASSWORD"
 
 
 st.set_page_config(
     page_title="Tender Radar",
-    page_icon="📡",
+    page_icon=str(BRAND_MARK),
     layout="wide"
 )
 
@@ -58,25 +61,33 @@ def inject_styles():
         }
 
         .stButton > button,
+        .stFormSubmitButton > button,
         .stLinkButton > a {
             min-height: 2.7rem;
             border-radius: 0.65rem;
             font-weight: 600;
         }
 
-        .stButton > button[kind="primary"] {
+        [data-testid="stIconMaterial"] {
+            font-size: 1.15rem;
+        }
+
+        .stButton > button[kind="primary"],
+        .stFormSubmitButton > button[kind="primaryFormSubmit"] {
             border-color: #2f80ed;
             background: #2f80ed;
             color: #ffffff;
         }
 
-        .stButton > button[kind="primary"]:hover {
+        .stButton > button[kind="primary"]:hover,
+        .stFormSubmitButton > button[kind="primaryFormSubmit"]:hover {
             border-color: #1f6fd8;
             background: #1f6fd8;
             color: #ffffff;
         }
 
         .stButton > button:focus-visible,
+        .stFormSubmitButton > button:focus-visible,
         .stLinkButton > a:focus-visible {
             outline: 3px solid rgba(64, 153, 255, 0.38);
             outline-offset: 2px;
@@ -127,6 +138,13 @@ def inject_styles():
             width: 64px;
             height: 64px;
             flex: 0 0 64px;
+        }
+
+        .login-brand-mark {
+            display: block;
+            width: 60px;
+            height: 60px;
+            margin-bottom: 0.35rem;
         }
 
         .brand-header h1,
@@ -223,6 +241,22 @@ def inject_styles():
     )
 
 
+def login_credentials() -> tuple[str, str]:
+    """Read credentials on the Streamlit server without exposing them to the UI."""
+    return os.getenv(USERNAME_ENV, "").strip(), os.getenv(PASSWORD_ENV, "")
+
+
+def credentials_match(username: str, password: str) -> bool:
+    expected_username, expected_password = login_credentials()
+    if not expected_username or not expected_password:
+        return False
+
+    return hmac.compare_digest(username, expected_username) and hmac.compare_digest(
+        password,
+        expected_password,
+    )
+
+
 def check_login():
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
@@ -231,20 +265,44 @@ def check_login():
         left, center, right = st.columns([1, 1.15, 1])
         with center:
             with st.container(border=True):
-                st.image(str(BRAND_MARK), width=60)
+                st.markdown(
+                    (
+                        f'<img class="login-brand-mark" src="{brand_mark_data_uri()}" '
+                        'alt="Tender Radar Logo">'
+                    ),
+                    unsafe_allow_html=True,
+                )
                 st.title("Willkommen")
                 st.caption("Bei Tender Radar anmelden")
 
-                username = st.text_input("Benutzername")
-                password = st.text_input("Passwort", type="password")
+                expected_username, expected_password = login_credentials()
+                if not expected_username or not expected_password:
+                    st.error(
+                        "Die Anmeldung ist momentan nicht verfügbar.",
+                        icon=":material/lock:",
+                    )
+                    st.stop()
 
-                if st.button("Login", use_container_width=True, type="primary"):
-                    if username == APP_USERNAME and password == APP_PASSWORD:
+                with st.form("login_form", clear_on_submit=True, border=False):
+                    username = st.text_input("Benutzername")
+                    password = st.text_input("Passwort", type="password")
+                    login_submitted = st.form_submit_button(
+                        "Anmelden",
+                        icon=":material/login:",
+                        use_container_width=True,
+                        type="primary",
+                    )
+
+                if login_submitted:
+                    if credentials_match(username, password):
                         st.session_state.logged_in = True
-                        st.success("Login erfolgreich.")
+                        st.success("Login erfolgreich.", icon=":material/check_circle:")
                         st.rerun()
                     else:
-                        st.error("Falscher Benutzername oder falsches Passwort.")
+                        st.error(
+                            "Falscher Benutzername oder falsches Passwort.",
+                            icon=":material/error:",
+                        )
 
         st.stop()
 
@@ -390,9 +448,9 @@ class StreamlitLogWriter(io.TextIOBase):
         parsed = parse_status_line(line)
 
         if parsed:
-            self.status_box.info(parsed["message"])
+            self.status_box.info(parsed["message"], icon=":material/sync:")
         else:
-            self.status_box.info(line)
+            self.status_box.info(line, icon=":material/sync:")
 
         progress = extract_progress_percent(line)
         if progress is not None:
@@ -431,19 +489,25 @@ def run_with_live_output(fn, title: str):
     writer = StreamlitLogWriter(status_box, progress_bar)
 
     try:
-        status_box.info(f"{title} läuft ...")
+        status_box.info(f"{title} läuft ...", icon=":material/sync:")
 
         with redirect_stdout(writer), redirect_stderr(writer):
             fn()
 
         writer.flush()
         progress_bar.progress(100)
-        status_box.success(f"{title} erfolgreich abgeschlossen.")
+        status_box.success(
+            f"{title} erfolgreich abgeschlossen.",
+            icon=":material/check_circle:",
+        )
         return True
 
     except Exception as e:
         writer.flush()
-        status_box.error(f"{title} wurde mit Fehler beendet: {e}")
+        status_box.error(
+            f"{title} wurde mit Fehler beendet: {e}",
+            icon=":material/error:",
+        )
         return False
 
 
@@ -455,7 +519,10 @@ def run_full_search():
     if not success_scan:
         return False
 
-    st.info("Marktscan ist fertig. Ausschreibungen werden analysiert ...")
+    st.info(
+        "Marktscan ist fertig. Ausschreibungen werden analysiert ...",
+        icon=":material/analytics:",
+    )
 
     success_analyse = run_with_live_output(run_relevanzanalyse, "Relevanzanalyse")
 
@@ -468,11 +535,12 @@ def run_full_search():
     return True
 
 
-def available_links(tender: dict) -> list[tuple[str, str]]:
+def available_links(tender: dict) -> list[tuple[str, str, str]]:
     links = [
         (
             "Zur Ausschreibung",
             first_display_value(tender.get("final_detail_url"), tender.get("detail_url")),
+            ":material/open_in_new:",
         ),
         (
             "Verfahrensangaben",
@@ -480,20 +548,21 @@ def available_links(tender: dict) -> list[tuple[str, str]]:
                 tender.get("final_verfahrensangaben_url"),
                 tender.get("verfahrensangaben_url"),
             ),
+            ":material/description:",
         ),
-        ("Externe Infos", tender.get("externe_info_url")),
+        ("Externe Infos", tender.get("externe_info_url"), ":material/language:"),
     ]
-    return [(label, url) for label, url in links if has_display_value(url)]
+    return [(label, url, icon) for label, url, icon in links if has_display_value(url)]
 
 
-def render_links(links: list[tuple[str, str]]):
+def render_links(links: list[tuple[str, str, str]]):
     if not links:
         return
 
     columns = st.columns(len(links))
-    for column, (label, url) in zip(columns, links):
+    for column, (label, url, icon) in zip(columns, links):
         with column:
-            st.link_button(label, url, use_container_width=True)
+            st.link_button(label, url, icon=icon, use_container_width=True)
 
 
 def render_metadata(items: list[tuple[str, object]]):
@@ -539,7 +608,7 @@ def render_tender_card(tender: dict):
         tender.get("auftraggeber_name"),
         tender.get("stelle_bezeichnung"),
     )
-    frist = first_display_value(
+    frist = display_deadline(
         tender.get("abgabefrist_detail"),
         tender.get("angebots_teilnahmefrist"),
         tender.get("teilnahmefrist"),
@@ -608,7 +677,7 @@ def render_tender_card(tender: dict):
             or bool(links)
         )
         if has_details:
-            with st.expander("Details & Links"):
+            with st.expander("Details & Links", icon=":material/info:"):
                 if has_display_value(beschreibung):
                     st.markdown("**Beschreibung**")
                     st.write(str(beschreibung).strip())
@@ -638,7 +707,7 @@ def render_section(title: str, tenders: list[dict]):
     st.subheader(f"{title} ({len(tenders)})")
 
     if not tenders:
-        st.info("Keine Einträge vorhanden.")
+        st.info("Keine Einträge vorhanden.", icon=":material/inbox:")
         return
 
     for tender in tenders:
@@ -661,9 +730,13 @@ def main():
         st.session_state.analyse_done_message = ""
 
     with st.sidebar:
-        st.header("Filter")
+        st.header(":material/filter_alt: Filter", anchor=False)
 
-        if st.button("🚪 Logout", use_container_width=True):
+        if st.button(
+            "Abmelden",
+            icon=":material/logout:",
+            use_container_width=True,
+        ):
             st.session_state.logged_in = False
             st.rerun()
 
@@ -689,7 +762,8 @@ def main():
     irgendwas_laeuft = st.session_state.scan_running or st.session_state.analyse_running
 
     if st.button(
-        "🔎 Ausschreibungen finden",
+        "Ausschreibungen finden",
+        icon=":material/search:",
         use_container_width=True,
         disabled=irgendwas_laeuft,
         type="primary",
@@ -727,10 +801,10 @@ def main():
     )
 
     tab1, tab2, tab3, tab4 = st.tabs([
-        "✅ PASSEND",
-        "⚠️ MANUELL",
-        "📦 NICHT AKTIV",
-        "❌ NICHT PASSEND",
+        ":material/check_circle: PASSEND",
+        ":material/rule: MANUELL",
+        ":material/inventory_2: NICHT AKTIV",
+        ":material/cancel: NICHT PASSEND",
     ])
 
     with tab1:
